@@ -1,0 +1,109 @@
+# ysd-order-service 配置（端口 8085，服务名 ysd-order-service）
+# 过渡方案（A1）：与 user-service / catalog-service / admin-service 等共用同一业务库 + 同一 Redis db10。
+# 本服务同时对外提供管理端（/admin/order）与用户端（/user/order、/user/shoppingCart），故 jwt 需 admin + user 两套。
+server:
+  port: 8085
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-order-service
+  # WebSocketServer(@Component) 与 Redis 监听容器互相引用，需放开循环依赖
+  main:
+    allow-circular-references: true
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+    # Sentinel：Feign 熔断降级。dashboard 填 Docker 宿主机映射端口 8718（容器内为 8858）
+    sentinel:
+      eager: true
+      transport:
+        dashboard: 127.0.0.1:8718
+        port: 8719
+      datasource:
+        degrade:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+            username: ${NACOS_USERNAME:nacos}
+            password: ${NACOS_PASSWORD:nacos}
+            dataId: ysd-order-service-sentinel-degrade
+            groupId: SENTINEL_GROUP
+            data-type: json
+            rule-type: degrade
+    openfeign: # ← 新增
+      # 开启 Feign 熔断：配合 Sentinel 提供的 CircuitBreakerFactory 与 @FeignClient(fallbackFactory)
+      circuitbreaker:
+        enabled: true
+      client:
+        config:
+          default:
+            loggerLevel: FULL
+          # AI 处方审核在下单同步链路内：3 秒拿不到结果就 fail-closed，不能让下单线程一直挂着
+          ysd-ai-service:
+            connectTimeout: 1000
+            readTimeout: 3000
+          # 药品属性是判断是否处方药的前置条件，同样限制超时
+          ysd-catalog-service:
+            connectTimeout: 1000
+            readTimeout: 2000
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:root}
+  # 各服务共用 Redis db10：WebSocket 跨实例广播（Pub/Sub）+ ShedLock 锁存储
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:10}
+  # RabbitMQ 生产端：开启 observation 把 trace 上下文注入消息头（默认 false，不开则 MQ 链路断链）
+  rabbitmq:
+    template:
+      observation-enabled: true
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+
+ysd:
+  jwt:
+    # 管理端令牌：secret 必须与网关一致，否则网关解析 401
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-only-admin-secret-change-me}
+    admin-ttl: 7200000
+    admin-token-name: token
+    # 用户端令牌：/user/order、/user/shoppingCart 走用户端拦截器
+    user-secret-key: ${JWT_USER_SECRET:dev-only-user-secret-change-me}
+    user-ttl: 7200000
+    user-token-name: authentication
+  wechat:
+    # PayNotifyController（/notify/paySuccess 回调解密）与 WeChatPayUtil 需要
+    appid: ${WECHAT_APPID:}
+    secret: ${WECHAT_APPSECRET:}
+    notifyURL: ${NOTIFY_BASE_URL:http://localhost:8085}/notify/paySuccess
+    refundNotifyUrl: ${NOTIFY_BASE_URL:http://localhost:8085}/notify/refundSuccess
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+  level:
+    com.ysd.api.client: DEBUG
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

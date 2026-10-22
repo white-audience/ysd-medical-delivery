@@ -1,0 +1,18 @@
+T09 故障注入验证（2026-10-20 21:32）
+========================================
+启动参数：--ysd.test.fail-order-detail=true
+请求：POST /user/order/submit  (userId=4, addressBookId=2, remark="T09 rollback test")
+响应：HTTP 500
+
+服务端异常（已实际触发，取自控制台日志）：
+java.lang.IllegalStateException: T09 fault-injection: fail after order_detail insert, before cart cleanup
+
+失败后计数（基线：orders=33 / order_detail=40 / cart=1）：
+orders_user4          33
+order_detail_total    40
+cart_user4            1
+
+结论：
+1. 异常确实发生在 order_detail 批量写入之后、购物车清空之前；
+2. orders 与 order_detail 已写入的行被 @Transactional 回滚；
+3. shopping_cart 未被清空，用户 4 的 1 件商品仍在。

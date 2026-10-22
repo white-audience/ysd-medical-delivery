@@ -1,0 +1,59 @@
+# ============================================================================
+# ysd-catalog-service 测试配置（profile = test）
+#
+#   - 数据库：H2 内存库（MODE=MySQL）替代 MySQL
+#   - Redis：EmbeddedRedisServer 拉起的真实 redis-server（端口 16379 / 密码 test123）
+#   - Nacos：关闭服务发现，避免测试期去连 127.0.0.1:8848
+#
+# 注意：catalog 主 application.yml 无 ${...} 外部占位符，无需补哑值。
+# ============================================================================
+spring:
+  datasource:
+    druid:
+      driver-class-name: org.h2.Driver
+      # NON_KEYWORDS=VALUE,USER 解除 H2 2.x 对 value / user 的保留字限制
+      url: jdbc:h2:mem:ysd_catalog_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE,USER
+      username: sa
+      password: ''
+      # 测试期不做连接保活/校验，避免 H2 内存库被误判为失效
+      test-while-idle: false
+      test-on-borrow: false
+      test-on-return: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 16379
+      password: test123
+      database: 0
+      timeout: 3000ms
+  cloud:
+    discovery:
+      enabled: false
+    nacos:
+      discovery:
+        enabled: false
+  # 每次启动上下文都重建表结构与基础数据，保证测试可重复执行
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema-h2.sql
+      data-locations: classpath:sql/data-h2.sql
+      continue-on-error: false
+  jmx:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    root: warn
+    com.ysd: info
+
+# 测试期关闭链路追踪：避免 Zipkin reporter 尝试连 127.0.0.1:9411 产生连接 warning
+management:
+  tracing:
+    enabled: false

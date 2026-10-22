@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ysd.mapper.ShoppingCartMapper">
+
+
+    <select id="list" resultType="com.ysd.entity.ShoppingCart">
+        select * from shopping_cart
+        <where>
+            <if test="userId != null">
+                and user_id = #{userId}
+            </if>
+            <if test="comboId != null">
+                and combo_id = #{comboId}
+            </if>
+            <if test="drugId != null">
+                and drug_id = #{drugId}
+            </if>
+            <if test="spec != null">
+                and spec = #{spec}
+            </if>
+        </where>
+    </select>
+
+    <insert id="insertBatch" parameterType="list">
+        insert into shopping_cart
+        (name, image, user_id, drug_id, combo_id, spec, number, amount, create_time)
+        values
+        <foreach collection="shoppingCartList" item="sc" separator=",">
+            (#{sc.name}, #{sc.image}, #{sc.userId}, #{sc.drugId}, #{sc.comboId}, #{sc.spec}, #{sc.number}, #{sc.amount}, #{sc.createTime})
+        </foreach>
+    </insert>
+</mapper>

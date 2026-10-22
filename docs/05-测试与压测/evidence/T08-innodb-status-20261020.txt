@@ -1,0 +1,268 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+*************************** 1. row ***************************
+  Type: InnoDB
+  Name: 
+Status: 
+=====================================
+2026-10-20 13:29:54 140105465431616 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 34 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 86 srv_active, 0 srv_shutdown, 10927 srv_idle
+srv_master_thread log flush and writes: 0
+----------
+SEMAPHORES
+----------
+OS WAIT ARRAY INFO: reservation count 797
+OS WAIT ARRAY INFO: signal count 768
+RW-shared spins 0, rounds 0, OS waits 0
+RW-excl spins 0, rounds 0, OS waits 0
+RW-sx spins 0, rounds 0, OS waits 0
+Spin rounds per wait: 0.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2026-10-20 13:29:50 140105890219584
+*** (1) TRANSACTION:
+TRANSACTION 25519, ACTIVE 5 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s)
+MySQL thread id 249, OS thread handle 140105465431616, query id 505733 localhost root statistics
+SELECT id,status FROM orders WHERE id=7 FOR UPDATE
+
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 124 page no 4 n bits 112 index PRIMARY of table `ysd_take_out`.`orders` trx id 25519 lock_mode X locks rec but not gap
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 26; compact format; info bits 0
+ 0: len 8; hex 8000000000000006; asc         ;;
+ 1: len 6; hex 000000004d14; asc     M ;;
+ 2: len 7; hex 01000000dd117e; asc       ~;;
+ 3: len 13; hex 31373533323137323030363936; asc 1753217200696;;
+ 4: len 4; hex 80000003; asc     ;;
+ 5: len 8; hex 8000000000000004; asc         ;;
+ 6: len 8; hex 8000000000000002; asc         ;;
+ 7: len 5; hex 99b72e4ba8; asc   .K ;;
+ 8: SQL NULL;
+ 9: len 4; hex 80000001; asc     ;;
+ 10: len 1; hex 80; asc  ;;
+ 11: len 5; hex 8000010100; asc      ;;
+ 12: len 0; hex ; asc ;;
+ 13: len 11; hex 3133323132333435363738; asc 13212345678;;
+ 14: SQL NULL;
+ 15: SQL NULL;
+ 16: len 7; hex 6c6973616c6c79; asc lisally;;
+ 17: len 18; hex e5aea2e688b7e794b5e8af9de58f96e6b688; asc                   ;;
+ 18: SQL NULL;
+ 19: len 5; hex 99b72f2993; asc   /) ;;
+ 20: len 5; hex 99b72e5b80; asc   .[ ;;
+ 21: len 1; hex 80; asc  ;;
+ 22: SQL NULL;
+ 23: len 4; hex 80000003; asc     ;;
+ 24: len 4; hex 80000000; asc     ;;
+ 25: len 1; hex 80; asc  ;;
+
+
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 124 page no 4 n bits 112 index PRIMARY of table `ysd_take_out`.`orders` trx id 25519 lock_mode X locks rec but not gap waiting
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 26; compact format; info bits 0
+ 0: len 8; hex 8000000000000007; asc         ;;
+ 1: len 6; hex 000000004c7e; asc     L~;;
+ 2: len 7; hex 81000000a50121; asc       !;;
+ 3: len 13; hex 31373533323137353435383738; asc 1753217545878;;
+ 4: len 4; hex 80000006; asc     ;;
+ 5: len 8; hex 8000000000000004; asc         ;;
+ 6: len 8; hex 8000000000000002; asc         ;;
+ 7: len 5; hex 99b72e4d1a; asc   .M ;;
+ 8: SQL NULL;
+ 9: len 4; hex 80000001; asc     ;;
+ 10: len 1; hex 80; asc  ;;
+ 11: len 5; hex 8000004f00; asc    O ;;
+ 12: len 0; hex ; asc ;;
+ 13: len 11; hex 3133323132333435363738; asc 13212345678;;
+ 14: SQL NULL;
+ 15: SQL NULL;
+ 16: len 7; hex 6c6973616c6c79; asc lisally;;
+ 17: len 24; hex e9aa91e6898be4b88de8b6b3e697a0e6b395e9858de98081; asc                         ;;
+ 18: SQL NULL;
+ 19: len 5; hex 99b72f298f; asc   /) ;;
+ 20: len 5; hex 99b72e5d00; asc   .] ;;
+ 21: len 1; hex 80; asc  ;;
+ 22: SQL NULL;
+ 23: len 4; hex 80000001; asc     ;;
+ 24: len 4; hex 80000000; asc     ;;
+ 25: len 1; hex 80; asc  ;;
+
+
+*** (2) TRANSACTION:
+TRANSACTION 25520, ACTIVE 4 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s)
+MySQL thread id 250, OS thread handle 140105464374848, query id 505734 localhost root statistics
+SELECT id,status FROM orders WHERE id=6 FOR UPDATE
+
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 124 page no 4 n bits 112 index PRIMARY of table `ysd_take_out`.`orders` trx id 25520 lock_mode X locks rec but not gap
+Record lock, heap no 3 PHYSICAL RECORD: n_fields 26; compact format; info bits 0
+ 0: len 8; hex 8000000000000007; asc         ;;
+ 1: len 6; hex 000000004c7e; asc     L~;;
+ 2: len 7; hex 81000000a50121; asc       !;;
+ 3: len 13; hex 31373533323137353435383738; asc 1753217545878;;
+ 4: len 4; hex 80000006; asc     ;;
+ 5: len 8; hex 8000000000000004; asc         ;;
+ 6: len 8; hex 8000000000000002; asc         ;;
+ 7: len 5; hex 99b72e4d1a; asc   .M ;;
+ 8: SQL NULL;
+ 9: len 4; hex 80000001; asc     ;;
+ 10: len 1; hex 80; asc  ;;
+ 11: len 5; hex 8000004f00; asc    O ;;
+ 12: len 0; hex ; asc ;;
+ 13: len 11; hex 3133323132333435363738; asc 13212345678;;
+ 14: SQL NULL;
+ 15: SQL NULL;
+ 16: len 7; hex 6c6973616c6c79; asc lisally;;
+ 17: len 24; hex e9aa91e6898be4b88de8b6b3e697a0e6b395e9858de98081; asc                         ;;
+ 18: SQL NULL;
+ 19: len 5; hex 99b72f298f; asc   /) ;;
+ 20: len 5; hex 99b72e5d00; asc   .] ;;
+ 21: len 1; hex 80; asc  ;;
+ 22: SQL NULL;
+ 23: len 4; hex 80000001; asc     ;;
+ 24: len 4; hex 80000000; asc     ;;
+ 25: len 1; hex 80; asc  ;;
+
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 124 page no 4 n bits 112 index PRIMARY of table `ysd_take_out`.`orders` trx id 25520 lock_mode X locks rec but not gap waiting
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 26; compact format; info bits 0
+ 0: len 8; hex 8000000000000006; asc         ;;
+ 1: len 6; hex 000000004d14; asc     M ;;
+ 2: len 7; hex 01000000dd117e; asc       ~;;
+ 3: len 13; hex 31373533323137323030363936; asc 1753217200696;;
+ 4: len 4; hex 80000003; asc     ;;
+ 5: len 8; hex 8000000000000004; asc         ;;
+ 6: len 8; hex 8000000000000002; asc         ;;
+ 7: len 5; hex 99b72e4ba8; asc   .K ;;
+ 8: SQL NULL;
+ 9: len 4; hex 80000001; asc     ;;
+ 10: len 1; hex 80; asc  ;;
+ 11: len 5; hex 8000010100; asc      ;;
+ 12: len 0; hex ; asc ;;
+ 13: len 11; hex 3133323132333435363738; asc 13212345678;;
+ 14: SQL NULL;
+ 15: SQL NULL;
+ 16: len 7; hex 6c6973616c6c79; asc lisally;;
+ 17: len 18; hex e5aea2e688b7e794b5e8af9de58f96e6b688; asc                   ;;
+ 18: SQL NULL;
+ 19: len 5; hex 99b72f2993; asc   /) ;;
+ 20: len 5; hex 99b72e5b80; asc   .[ ;;
+ 21: len 1; hex 80; asc  ;;
+ 22: SQL NULL;
+ 23: len 4; hex 80000003; asc     ;;
+ 24: len 4; hex 80000000; asc     ;;
+ 25: len 1; hex 80; asc  ;;
+
+*** WE ROLL BACK TRANSACTION (2)
+------------
+TRANSACTIONS
+------------
+Trx id counter 25521
+Purge done for trx's n:o < 25519 undo n:o < 0 state: running but idle
+History list length 2
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 421581355214416, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355213608, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355217648, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355212800, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355211992, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355211184, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 421581355210376, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+I/O thread 0 state: waiting for completed aio requests (insert buffer thread)
+I/O thread 1 state: waiting for completed aio requests (read thread)
+I/O thread 2 state: waiting for completed aio requests (read thread)
+I/O thread 3 state: waiting for completed aio requests (read thread)
+I/O thread 4 state: waiting for completed aio requests (read thread)
+I/O thread 5 state: waiting for completed aio requests (write thread)
+I/O thread 6 state: waiting for completed aio requests (write thread)
+I/O thread 7 state: waiting for completed aio requests (write thread)
+I/O thread 8 state: waiting for completed aio requests (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:
+Pending flushes (fsync) log: 0; buffer pool: 0
+12564 OS file reads, 102052 OS file writes, 29501 OS fsyncs
+0.00 reads/s, 0 avg bytes/read, 0.20 writes/s, 0.23 fsyncs/s
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 0, seg size 2, 0 merges
+merged operations:
+ insert 0, delete mark 0, delete 0
+discarded operations:
+ insert 0, delete mark 0, delete 0
+Hash table size 34679, node heap has 3 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+Hash table size 34679, node heap has 149 buffer(s)
+Hash table size 34679, node heap has 3 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+0.00 hash searches/s, 0.12 non-hash searches/s
+---
+LOG
+---
+Log sequence number          280894360
+Log buffer assigned up to    280894360
+Log buffer completed up to   280894360
+Log written up to            280894360
+Log flushed up to            280894360
+Added dirty pages up to      280894360
+Pages flushed up to          280894360
+Last checkpoint at           280894360
+Log minimum file id is       66
+Log maximum file id is       85
+65505 log i/o's done, 0.06 log i/o's/second
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 0
+Dictionary memory allocated 730429
+Buffer pool size   8192
+Free buffers       1024
+Database pages     7006
+Old database pages 2566
+Modified db pages  0
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 10674, not young 506954
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 5167, created 16601, written 19655
+0.00 reads/s, 0.00 creates/s, 0.06 writes/s
+Buffer pool hit rate 1000 / 1000, young-making rate 0 / 1000 not 0 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 7006, unzip_LRU len: 0
+I/O sum[2]:cur[0], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 queries inside InnoDB, 0 queries in queue
+0 read views open inside InnoDB
+Process ID=1, Main thread ID=140105881826880 , state=sleeping
+Number of rows inserted 601735, updated 4, deleted 106, read 14545926
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.09 reads/s
+Number of system rows inserted 2124, updated 791, deleted 1889, read 15351
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.00 reads/s
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+

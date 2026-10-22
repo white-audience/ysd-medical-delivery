@@ -1,0 +1,31 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+cart_rows
+1
+orders_total
+33
+order_detail_total
+40
+id	number	user_id	remark	order_time
+28	1791678979522	4	测试	2026-10-11 08:36:20
+29	1791679003257	4	测试	2026-10-11 08:36:43
+30	1791679326662	4	测试	2026-10-11 08:42:07
+31	1791679439447	4	测试	2026-10-11 08:43:59
+32	1791679502932	4	测试	2026-10-11 08:45:03
+33	1791680002548	4	测试	2026-10-11 08:53:23
+34	1791680012701	4	测试	2026-10-11 08:53:33
+35	1791680102843	4	测试	2026-10-11 08:55:03
+36	1791680119076	4	测试	2026-10-11 08:55:19
+37	1791697515922	4	测试	2026-10-11 13:45:16
+38	1792493436995	4	regression-test	2026-10-20 18:50:37
+id	user_id	drug_id	number	amount
+159	4	46	2	6.00
+cart_rows_after
+0
+orders_total_after
+22
+order_detail_total_after
+29
+drug_rows_after
+100025
+dup_cart_after
+0

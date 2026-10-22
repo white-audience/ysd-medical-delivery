@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ysd.mapper.DrugComboMapper">
+    <insert id="insert" parameterType="DrugCombo" useGeneratedKeys="true" keyProperty="id">
+        insert into drug_combo
+        (category_id, name, price, status, description, image, create_time, update_time, create_user, update_user)
+        values (#{categoryId}, #{name}, #{price}, #{status}, #{description}, #{image}, #{createTime}, #{updateTime},
+                #{createUser}, #{updateUser})
+    </insert>
+
+    <update id="update">
+        update drug_combo
+        <set>
+            <if test="name != null">
+                name = #{name},
+            </if>
+            <if test="categoryId != null">
+                category_id = #{categoryId},
+            </if>
+            <if test="price != null">
+                price = #{price},
+            </if>
+            <if test="status != null">
+                status = #{status},
+            </if>
+            <if test="description != null">
+                description = #{description},
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <select id="pageQuery" resultType="com.ysd.vo.DrugComboVO">
+        select
+        s.*, c.name categoryName
+        from
+        drug_combo s
+        left join
+        category c
+        on
+        s.category_id = c.id
+        <where>
+            <if test="name != null">
+                and s.name like concat('%',#{name},'%')
+            </if>
+            <if test="status != null">
+                and s.status = #{status}
+            </if>
+            <if test="categoryId != null">
+                and s.category_id = #{categoryId}
+            </if>
+        </where>
+        order by s.create_time desc
+    </select>
+
+    <select id="list" parameterType="DrugCombo" resultType="DrugCombo">
+        select * from drug_combo
+        <where>
+            <if test="name != null"> and name like concat('%',#{name},'%') </if>
+            <if test="categoryId != null"> and category_id = #{categoryId} </if>
+            <if test="status != null"> and status = #{status} </if>
+        </where>
+    </select>
+
+    <select id="countByMap" resultType="java.lang.Integer">
+        select count(id) from drug_combo
+        <where>
+            <if test="status != null"> and status = #{status} </if>
+            <if test="categoryId != null"> and category_id = #{categoryId} </if>
+        </where>
+    </select>
+</mapper>

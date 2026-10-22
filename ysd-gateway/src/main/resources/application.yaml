@@ -1,0 +1,98 @@
+server:
+  port: 9000
+  # 网关默认监听所有网卡，便于真机/局域网访问；容器内同样适用
+  address: ${SERVER_ADDRESS:0.0.0.0}
+
+spring:
+  application:
+    name: ysd-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}        # 如果 Nacos 开了鉴权，加这两行
+        password: ${NACOS_PASSWORD:nacos}
+    # Sentinel 网关限流。dashboard 填 Docker 宿主机映射端口 8718（容器内为 8858）
+    # port 8720 与 order-service(8719) 错开，避免同机端口冲突
+    sentinel:
+      eager: true
+      transport:
+        dashboard: 127.0.0.1:8718
+        port: 8720
+      datasource:
+        gw-flow:
+          nacos:
+            server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+            username: ${NACOS_USERNAME:nacos}
+            password: ${NACOS_PASSWORD:nacos}
+            dataId: ysd-gateway-sentinel-gw-flow
+            groupId: SENTINEL_GROUP
+            data-type: json
+            rule-type: gw-flow
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: ysd-admin-service
+              uri: lb://ysd-admin-service
+              predicates:
+                - Path=/admin/employee/**,/admin/shop/**,/admin/common/**
+              order: -1
+
+            - id: ysd-user-service
+              uri: lb://ysd-user-service
+              predicates:
+                - Path=/user/user/**,/user/addressBook/**
+              order: -1
+
+            - id: ysd-report-service
+              uri: lb://ysd-report-service
+              predicates:
+                - Path=/admin/report/**,/admin/workspace/**
+              order: -1
+
+            - id: ysd-catalog-service
+              uri: lb://ysd-catalog-service
+              predicates:
+                - Path=/admin/category/**,/admin/drug/**,/admin/drug-combo/**,/user/category/**,/user/drug/**,/user/drug-combo/**,/user/shop/**
+              order: -1
+
+            - id: ysd-order-service
+              uri: lb://ysd-order-service
+              predicates:
+                - Path=/admin/order/**,/user/order/**,/user/shoppingCart/**,/notify/**
+              order: -1
+
+            # WebSocket 升级路由：前端连 ws://网关:9000/ws/{sid}，由网关转发到推送服务
+            - id: ysd-push-service-ws
+              uri: lb:ws://ysd-push-service
+              predicates:
+                - Path=/ws/**
+              order: -1
+
+            # AI 服务：与其它路由一致保留原始路径（AI 服务控制器自带 /ai 前缀）。
+            # /ai/** 不在 AuthGlobalFilter 白名单内，必须携带用户端 authentication 头。
+            - id: ysd-ai-service
+              uri: lb://ysd-ai-service
+              predicates:
+                - Path=/ai/**
+              order: -1
+ysd:
+  jwt:
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-only-admin-secret-change-me}
+    admin-ttl: 7200000
+    admin-token-name: token
+    user-secret-key: ${JWT_USER_SECRET:dev-only-user-secret-change-me}
+    user-ttl: 7200000
+    user-token-name: authentication
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

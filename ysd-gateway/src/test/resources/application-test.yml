@@ -1,0 +1,5 @@
+# 测试期关闭链路追踪：避免 Zipkin reporter 尝试连 127.0.0.1:9411 产生连接 warning。
+# 与 ysd-catalog-service / ysd-order-service 的测试配置保持一致。
+management:
+  tracing:
+    enabled: false

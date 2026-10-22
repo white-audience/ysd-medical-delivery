@@ -1,0 +1,19 @@
+# 构建上下文瘦身：这些内容不参与镜像构建
+.git
+.gitignore
+.idea
+.idea.bak.*
+.env
+docs
+jmeter
+ysd-admin-web
+ysd-miniapp
+scripts
+**/target
+**/node_modules
+README.md
+SECURITY.md
+CONTRIBUTING.md
+NOTICE.md
+interview-qa.md
+diff-*.txt

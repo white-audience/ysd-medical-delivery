@@ -1,0 +1,101 @@
+# ============================================================================
+# 测试环境配置（profile = test）
+#
+# 为什么需要这个文件：
+#   主 application.yml 里大量使用 ${ysd.datasource.*} / ${ysd.alioss.*} /
+#   ${ysd.wechat.*} 占位符，这些值原本由 application-dev.yml 提供。
+#   测试激活 test profile 时 dev 不会加载，占位符将无法解析导致启动失败，
+#   因此这里必须把对应的 ysd.* 键全部补齐（值可以是哑值）。
+#
+# 数据库：H2 内存库，MODE=MySQL
+#   ⚠ H2 与 MySQL 的行为差异（测试结论需据此打折）：
+#     1. H2 无真正的 MySQL 存储引擎，EXPLAIN 输出格式与 MySQL 完全不同，
+#        无法直接比对 MySQL 的 type/key/rows 列；
+#     2. H2 的 InnoDB 行锁、MVCC 隔离级别语义与 MySQL 不同，
+#        并发事务行为不能等价；
+#     3. H2 在 MODE=MySQL 下不支持 MySQL 专有函数、ON DUPLICATE KEY UPDATE
+#        的完整语义，也不支持索引前缀长度、全文索引；
+#     4. H2 默认大小写行为与 MySQL 不同，靠 DATABASE_TO_LOWER +
+#        CASE_INSENSITIVE_IDENTIFIERS 近似；
+#     5. `value` / `user` 是 H2 2.x 保留字，需要 NON_KEYWORDS 解除保留。
+#   因此：涉及真实索引优化、真实执行计划的结论，必须在真实 MySQL 上复核。
+#
+# Redis：由 EmbeddedRedisServer 在测试启动时拉起真实 redis-server 进程
+#   （端口见 ysd.support.EmbeddedRedisServer.PORT，默认 16379）
+# ============================================================================
+
+ysd:
+  datasource:
+    driver-class-name: org.h2.Driver
+    host: 127.0.0.1
+    port: 0
+    database: ysd_test
+    username: sa
+    password: ''
+  alioss:
+    endpoint: test-endpoint
+    access-key-id: test-ak
+    access-key-secret: test-sk
+    bucket-name: test-bucket
+    redis:
+      host: 127.0.0.1
+      port: 16379
+      password: test123
+      database: 0
+  wechat:
+    appid: test-appid
+    secret: test-secret
+    notifyURL: http://127.0.0.1/notify/paySuccess
+    refundNotifyUrl: http://127.0.0.1/notify/refundSuccess
+
+spring:
+  datasource:
+    druid:
+      driver-class-name: org.h2.Driver
+      # NON_KEYWORDS=VALUE,USER 解除 H2 2.x 对 value / user 的保留字限制
+      # （drug_spec.value 列、user 表名）
+      url: jdbc:h2:mem:ysd_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE,USER
+      username: sa
+      password: ''
+      # 测试期不做连接保活/校验，避免 H2 内存库被误判为失效
+      test-while-idle: false
+      test-on-borrow: false
+      test-on-return: false
+  # Spring Boot 3 起 spring.redis.* 迁移到 spring.data.redis.*
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 16379
+      password: test123
+      database: 0
+      timeout: 3000ms
+  cache:
+    type: redis
+  # 每次启动上下文都重建表结构与基础数据，保证测试可重复执行
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema-h2.sql
+      data-locations: classpath:sql/data-h2.sql
+      continue-on-error: false
+  # 关掉 JMX，减少测试期端口冲突
+  jmx:
+    enabled: false
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    root: warn
+    com.ysd: info
+    com.ysd.mapper: debug
+    org.springframework.jdbc.datasource.init: debug
+
+# 测试期关闭链路追踪：避免 Zipkin reporter 尝试连 127.0.0.1:9411 产生连接 warning
+management:
+  tracing:
+    enabled: false

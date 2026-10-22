@@ -1,0 +1,51 @@
+# ysd-report-service 配置（端口 8083，服务名 ysd-report-service）
+# 过渡方案：报表服务直接读业务库（orders/user/drug/drug_combo 等），是技术债，阶段 5 用 CQRS 修。
+server:
+  port: 8083
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-report-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:root}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+
+ysd:
+  jwt:
+    # 管理端令牌：secret 必须与网关一致，否则网关解析 401
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-only-admin-secret-change-me}
+    admin-ttl: 7200000
+    admin-token-name: token
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

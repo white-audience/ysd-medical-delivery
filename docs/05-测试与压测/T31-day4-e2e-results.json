@@ -1,0 +1,36 @@
+[
+  {
+    "case": "OTC 正常下单",
+    "request": "购物车 drugId=46（999感冒灵颗粒，prescriptionType=0）",
+    "result": "success",
+    "orderId": 42,
+    "orderNumber": "1792584796280"
+  },
+  {
+    "case": "处方药未上传处方",
+    "request": "购物车 drugId=51（阿莫西林胶囊，prescriptionType=1），prescriptionUrl=null",
+    "result": "rejected",
+    "message": "购物车包含处方药，请先上传处方后再下单"
+  },
+  {
+    "case": "处方药 + AI 审核通过",
+    "request": "购物车 drugId=51，prescriptionUrl=https://oss.example.com/rx/day4-test.jpg",
+    "result": "success",
+    "orderId": 43,
+    "orderNumber": "1792584797749"
+  },
+  {
+    "case": "AI 服务宕机 fail-closed",
+    "request": "停止 ai-service 后，购物车 drugId=51 + 已上传处方",
+    "result": "rejected",
+    "elapsedSeconds": 0.11,
+    "message": "处方审核服务暂时不可用，为保障用药安全暂不能下单，请稍后重试"
+  },
+  {
+    "case": "OTC 省略可选字段",
+    "request": "购物车 drugId=46，请求体省略 packAmount / tablewareNumber / tablewareStatus",
+    "result": "success",
+    "orderId": 44,
+    "orderNumber": "1792585589556"
+  }
+]

@@ -1,0 +1,51 @@
+# ysd-user-service 配置（端口 8081，服务名 ysd-user-service），内容待填
+server:
+  port: 8081
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-user-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:root}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:10}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+ysd:
+  jwt:
+    user-secret-key: ${JWT_USER_SECRET:dev-only-user-secret-change-me}
+    user-ttl: 7200000
+    user-token-name: authentication
+  wechat:
+    appid: ${WECHAT_APPID:}
+    secret: ${WECHAT_APPSECRET:}
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

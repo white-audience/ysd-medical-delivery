@@ -1,0 +1,213 @@
+# 药速达（ysd-take-out）Docker Compose 一键部署
+#
+#   docker compose up -d          # 首次会构建 catalog / ai 两个镜像
+#   docker-compose up -d          # 旧版独立二进制的等价命令
+#   docker compose logs -f        # 查看启动日志
+#   docker compose down           # 停止（保留数据卷）
+#   docker compose down -v        # 停止并清空 MySQL/Redis/Nacos 数据
+#
+# 启动前准备：
+#   1. 复制 .env.example 为 .env，填入 DEEPSEEK_API_KEY（不填也能启动，AI 对话会失败）
+#   2. 宿主机 Ollama 需监听 0.0.0.0:18434，并已执行 ollama pull bge-m3
+#   3. 本机若已启动 Nacos/MySQL/Redis，请先停掉，或修改下面对应的宿主机端口
+name: ysd-take-out
+
+# 所有业务服务共用的 Nacos 注册配置（容器内通过服务名访问）
+x-service-common: &service-common
+  TZ: Asia/Shanghai
+  # 容器间需要互相访问，不能绑定回环地址；宿主机本机启动时默认 127.0.0.1
+  SERVER_ADDRESS: "0.0.0.0"
+  SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+  SPRING_CLOUD_NACOS_DISCOVERY_USERNAME: ${NACOS_USERNAME:-nacos}
+  SPRING_CLOUD_NACOS_DISCOVERY_PASSWORD: ${NACOS_PASSWORD:?set NACOS_PASSWORD in .env}
+
+# 构建基础镜像（Docker Hub 访问受限时可在 .env 中覆盖）
+x-build-args: &build-args
+  MAVEN_IMAGE: ${MAVEN_IMAGE:-maven:3.9-eclipse-temurin-21}
+  JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+services:
+  # ---------------------------------------------------------------- Nacos
+  # 演示用 standalone + 内置 Derby；生产建议切 MySQL 模式（挂载 nacos-mysql.sql）
+  nacos:
+    image: nacos/nacos-server:v3.0.3
+    container_name: ysd-nacos
+    environment:
+      MODE: standalone
+      # Nacos 3.x 默认开启鉴权，以下三项必须设置
+      NACOS_AUTH_ENABLE: "true"
+      NACOS_AUTH_TOKEN: ${NACOS_AUTH_TOKEN:?set NACOS_AUTH_TOKEN in .env}
+      NACOS_AUTH_IDENTITY_KEY: ${NACOS_AUTH_IDENTITY_KEY:-serverIdentity}
+      NACOS_AUTH_IDENTITY_VALUE: ${NACOS_AUTH_IDENTITY_VALUE:-security}
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+      JVM_XMN: 256m
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:8848:8848"   # 客户端 API：服务注册 / 配置
+      - "127.0.0.1:9848:9848"   # gRPC：Nacos 3.x 客户端必需
+      - "127.0.0.1:8849:8080"   # 控制台 http://localhost:8849 （避开本机 8080 占用）
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    healthcheck:
+      # Nacos 3 已移除 /v1/console/health/readiness（返回 410），改探 API 根路径
+      test: ["CMD", "curl", "-fsS", "http://localhost:8848/nacos/"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- Nacos 初始化
+  # Nacos 2.4+/3.x 不再内置默认账号。未初始化时业务服务注册会报
+  # 401 "User not found"，failFast 导致应用直接启动失败。
+  # 首次启动由本一次性容器创建管理员；已初始化时接口返回 409，可安全重复执行。
+  nacos-init:
+    image: nacos/nacos-server:v3.0.3
+    container_name: ysd-nacos-init
+    depends_on:
+      nacos:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        curl -fsS -X POST "http://nacos:8848/nacos/v3/auth/user/admin"
+        -d "password=${NACOS_ADMIN_PASSWORD:?set NACOS_ADMIN_PASSWORD in .env}"
+    restart: "no"
+
+  # ---------------------------------------------------------------- MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: ysd-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ysd_take_out
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    ports:
+      # 宿主机用 3307，避免和本机已有的 MySQL(3306) 冲突；
+      # 容器内业务服务仍然连接 mysql:3306
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次创建数据卷时自动执行 init 目录下的 *.sql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- Redis
+  # 注意：必须是 Redis Stack。AI 服务的 RAG 使用 RediSearch 向量索引，
+  # 普通 redis:7 镜像没有 FT.CREATE 等命令，AI 服务会在启动时失败。
+  redis:
+    # Docker Hub 不可达时可改用镜像加速地址，例如：
+    #   REDIS_IMAGE=docker.1ms.run/redis/redis-stack-server:latest
+    image: ${REDIS_IMAGE:-redis/redis-stack-server:latest}
+    container_name: ysd-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- 商品目录服务
+  ysd-catalog-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        <<: *build-args
+        MODULE: ysd-catalog-service
+    image: ysd/ysd-catalog-service:1.0.0
+    container_name: ysd-catalog-service
+    environment:
+      <<: *service-common
+      # 覆盖 application.yml 里的 127.0.0.1，否则 Nacos 会注册成容器内回环地址
+      SPRING_CLOUD_NACOS_DISCOVERY_IP: ysd-catalog-service
+      SPRING_DATASOURCE_DRUID_URL: jdbc:mysql://mysql:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_DRUID_USERNAME: ${MYSQL_USERNAME:-root}
+      SPRING_DATASOURCE_DRUID_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_DATABASE: "10"
+      # 本 compose 未包含 Zipkin；如宿主机已启动 Zipkin，删掉这一行并把 endpoint 指过去
+      MANAGEMENT_TRACING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8084:8084"
+    depends_on:
+      nacos:
+        condition: service_started
+      nacos-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8084/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- AI 服务
+  ysd-ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        <<: *build-args
+        MODULE: ysd-ai-service
+    image: ysd/ysd-ai-service:1.0.0
+    container_name: ysd-ai-service
+    environment:
+      <<: *service-common
+      SPRING_CLOUD_NACOS_DISCOVERY_IP: ysd-ai-service
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_DATABASE: "0"
+      # 容器内访问宿主机 Ollama（宿主机需监听 0.0.0.0:18434）
+      OLLAMA_BASE_URL: http://host.docker.internal:18434
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      # Sentinel 控制台在宿主机时使用；没有启动控制台也不影响服务运行
+      SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD: host.docker.internal:8718
+      MANAGEMENT_TRACING_ENABLED: "false"
+    extra_hosts:
+      # Linux 下让 host.docker.internal 指向宿主机；Windows/macOS Docker Desktop 原生支持
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8088:8088"
+    depends_on:
+      nacos:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      ysd-catalog-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8088/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+
+volumes:
+  nacos-data:
+  nacos-logs:
+  mysql-data:
+  redis-data:

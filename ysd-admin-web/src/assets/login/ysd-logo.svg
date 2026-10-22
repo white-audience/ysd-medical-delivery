@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 31" width="120" height="31">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#1677ff"/>
+      <stop offset="100%" stop-color="#4096ff"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="4" width="23" height="23" rx="5" fill="url(#g1)"/>
+  <rect x="3" y="7" width="17" height="17" rx="3" fill="#fff" opacity="0.15"/>
+  <rect x="6" y="11" width="11" height="3" rx="1.5" fill="#fff"/>
+  <rect x="6" y="17" width="11" height="3" rx="1.5" fill="#fff"/>
+  <text x="31" y="22" font-family="PingFangSC, Microsoft YaHei, sans-serif" font-size="16" font-weight="700" fill="#ffffff">药速达</text>
+</svg>

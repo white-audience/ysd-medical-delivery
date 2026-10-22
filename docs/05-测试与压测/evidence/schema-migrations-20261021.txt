@@ -1,0 +1,5 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+version	description	applied_at
+001_rename_dish_to_drug	dish/setmeal/dish_flavor/setmeal_dish -> drug/drug_combo/drug_spec/drug_combo_item; rename drug_id/combo_id/spec/quantity	2026-10-20 10:42:29
+002_add_drug_indexes	add idx_drug_category_id/idx_drug_status/idx_drug_spec_drug_id/idx_drug_combo_category_id/idx_drug_combo_item_combo_id	2026-10-20 10:51:40
+003_database_optimization_and_fixes	shopping_cart: dedup + unique uk_user_drug(user_id,drug_id); drug: add idx_drug_cat_status_time(category_id,status,create_time), drop idx_drug_category_id, idx_drug_status INVISIBLE	2026-10-21 10:40:20

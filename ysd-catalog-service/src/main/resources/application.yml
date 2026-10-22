@@ -1,0 +1,61 @@
+# ysd-catalog-service 配置（端口 8084，服务名 ysd-catalog-service）
+# 药品目录：分类 / 药品 / 药品组合。过渡方案：各业务服务（admin/user/report/catalog/order）共用同一业务库 + 同一 Redis db10。
+server:
+  port: 8084
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-catalog-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:root}
+  # 与 ysd-admin-service 共用 Redis db10：管理端写操作后的缓存失效才能清掉用户端缓存
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:10}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+
+ysd:
+  jwt:
+    # 管理端令牌：secret 必须与网关一致，否则网关解析 401
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-only-admin-secret-change-me}
+    admin-ttl: 7200000
+    admin-token-name: token
+    # 用户端令牌：/user/category、/user/drug、/user/drug-combo 走用户端拦截器
+    user-secret-key: ${JWT_USER_SECRET:dev-only-user-secret-change-me}
+    user-ttl: 7200000
+    user-token-name: authentication
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

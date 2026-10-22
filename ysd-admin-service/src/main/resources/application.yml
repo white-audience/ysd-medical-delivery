@@ -1,0 +1,66 @@
+# ysd-admin-service 配置（端口 8082，服务名 ysd-admin-service）
+server:
+  port: 8082
+  # 默认只监听回环地址；容器内通过 SERVER_ADDRESS=0.0.0.0 覆盖
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-admin-service
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+  datasource:
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://localhost:3306/ysd_take_out?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+      username: ${MYSQL_USERNAME:root}
+      password: ${MYSQL_PASSWORD:root}
+  # 与 ysd-catalog-service 共用同一 Redis 实例与 database：管理端写入 SHOP_STATUS，catalog 的 /user/shop/status 读取
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:10}
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.ysd.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+
+ysd:
+  jwt:
+    # 管理端令牌：secret 必须与网关一致，否则网关解析 401
+    admin-secret-key: ${JWT_ADMIN_SECRET:dev-only-admin-secret-change-me}
+    admin-ttl: 7200000
+    admin-token-name: token
+  alioss:
+    endpoint: oss-cn-beijing.aliyuncs.com
+    access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET:}
+    bucket-name: ${ALIYUN_OSS_BUCKET:}
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样；TODO 生产改 0.1
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

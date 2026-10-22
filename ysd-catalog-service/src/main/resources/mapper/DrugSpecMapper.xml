@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ysd.mapper.DrugSpecMapper">
+    <insert id="insertBatch">
+        insert into drug_spec (drug_id, name, value) values
+        <foreach collection="specs" item="spec" separator=",">
+            (#{spec.drugId}, #{spec.name}, #{spec.value})
+        </foreach>
+    </insert>
+
+    <delete id="deleteByDrugIds">
+        delete from drug_spec where drug_id in
+        <foreach collection="drugIds" item="drugId" separator="," open="(" close=")">
+            #{drugId}
+        </foreach>
+    </delete>
+</mapper>

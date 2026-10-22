@@ -1,0 +1,34 @@
+=== 项目收尾脏数据清理（2026-10-21）===
+
+【清理前】
+cart          1
+orders        24
+order_detail  28
+drug          100025
+user          2
+address_book  1
+
+【清理对象】
+orders 40 (number=1792580467026, user_id=5, status=6, 2026-10-21 19:01:07)  T31/T26 测试订单
+orders 41 (number=1792580570218, user_id=4, status=6, 2026-10-21 19:02:50)  T26 测试订单
+order_detail 46, 47（上述订单明细）
+shopping_cart 212 (user_id=5, drug_id=48, 2026-10-21 19:02:45)             测试购物车
+user 5 (openid=test-openid-001)                                             测试账号
+
+【清理后】
+cart                    0
+orders                  22   （保留 2025-07 ~ 2025-10 的演示历史订单）
+order_detail            26
+drug                    100025（10 万条压测数据完整保留）
+user                    1    （保留演示用户 id=4）
+address_book            1
+orphan_order_detail     0
+duplicate_cart_groups   0
+
+【唯一索引验证】
+SHOW INDEX：shopping_cart.uk_user_drug (user_id, drug_id), Non_unique=0, BTREE
+重复插入测试：
+  INSERT ... VALUES (user_id=4, drug_id=46)   -- 成功（事务内）
+  INSERT ... VALUES (user_id=4, drug_id=46)   -- ERROR 1062: Duplicate entry '4-46' for key 'shopping_cart.uk_user_drug'
+  ROLLBACK 后 shopping_cart 行数 = 0，未留下脏数据。
+结论：uk_user_drug 存在且唯一约束生效。

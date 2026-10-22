@@ -1,0 +1,80 @@
+# ysd-ai-service 配置（端口 8088，服务名 ysd-ai-service）
+# Agent 能力底座：Nacos 注册与现有服务同集群（客户端连接端口 8848）。
+server:
+  port: 8088
+  address: ${SERVER_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ysd-ai-service
+  # SSE 走 Servlet 异步响应：请求线程立即释放，异步超时需覆盖一次完整的大模型回答
+  mvc:
+    async:
+      request-timeout: 180000
+  # RAG 向量库连接信息（RagConfig 手动构建 JedisPooled 时读取）
+  # RediSearch 索引只能建在 db0，用 ysd:rag: 前缀与业务 key 隔离
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        ip: 127.0.0.1
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD:nacos}
+    # Sentinel 限流：防止 AI 接口被恶意刷取导致 Token 消耗过大。
+    # dashboard 填 Docker 宿主机映射端口 8718；port 8721 与 order-service(8719) / gateway(8720) 错开
+    sentinel:
+      eager: true
+      transport:
+        dashboard: 127.0.0.1:8718
+        port: 8721
+    # Feign 短超时：catalog 不可用时快速失败，避免阻塞 LLM 请求
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 2000
+            readTimeout: 5000
+          # 处方审核内部接口会同步调 catalog；下游慢时尽快失败，由 order-service fail-closed
+          ysd-catalog-service:
+            connectTimeout: 1000
+            readTimeout: 2000
+  # DeepSeek 走 OpenAI 兼容协议；api-key 从环境变量注入，避免密钥进 git
+  ai:
+    openai:
+      base-url: https://api.deepseek.com
+      api-key: ${DEEPSEEK_API_KEY}
+      chat:
+        options:
+          model: deepseek-chat
+    # 向量化走本地 Ollama bge-m3（1024 维），Chat 仍走 DeepSeek
+    # 容器部署时由 docker-compose 注入 OLLAMA_BASE_URL=http://host.docker.internal:18434
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:18434}
+      embedding:
+        options:
+          model: bge-m3
+    model:
+      chat: openai
+      embedding: ollama
+
+# RAG 检索参数：QuestionAnswerAdvisor 与 /ai/drug/debug/retrieve 共用
+rag:
+  search:
+    top-k: 4
+    similarity-threshold: 0.5
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+management:
+  tracing:
+    sampling:
+      probability: 1.0        # 本地全采样
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>ysd-take-out</artifactId>
+        <groupId>com.ysd</groupId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <artifactId>ysd-api</artifactId>
+    <packaging>jar</packaging>
+
+    <description>跨服务契约：Feign 接口 + 专用 DTO（阶段 5 引入）</description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- 复用 BaseContext、Result -->
+        <dependency>
+            <groupId>com.ysd</groupId>
+            <artifactId>ysd-common</artifactId>
+        </dependency>
+
+        <!-- Feign 声明式客户端（版本由 Spring Cloud 2025.0.0 BOM 管理） -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-openfeign</artifactId>
+        </dependency>
+
+        <!-- Feign 客户端负载均衡：Ribbon 移除后必须显式引入（nacos-discovery 不传递） -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+    </dependencies>
+</project>

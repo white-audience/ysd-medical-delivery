@@ -1,0 +1,32 @@
+**/target/
+.idea
+.idea.bak.*
+.idea/dataSources*.xml
+*.iml
+*.class
+
+# 本地密钥与配置，禁止提交
+.env
+.env.*
+!.env.example
+
+# 日志、压测产物与证书
+*.log
+logs/
+jmeter/results/
+jmeter/reports/
+jmeter/.local/
+*.pem
+*.p12
+*.jks
+*.key
+
+# 前端构建产物
+dist/
+node_modules/
+
+# 本地备份/导出物，禁止提交
+backups/
+*.bundle
+*.patch
+*.tar.gz

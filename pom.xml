@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <groupId>org.springframework.boot</groupId>
+        <version>3.5.16</version>
+    </parent>
+    <groupId>com.ysd</groupId>
+    <artifactId>ysd-take-out</artifactId>
+    <packaging>pom</packaging>
+    <version>1.0-SNAPSHOT</version>
+    <modules>
+        <module>ysd-common</module>
+        <module>ysd-pojo</module>
+        <module>ysd-api</module>
+        <module>ysd-gateway</module>
+        <module>ysd-user-service</module>
+        <module>ysd-admin-service</module>
+        <module>ysd-report-service</module>
+        <module>ysd-catalog-service</module>
+        <module>ysd-order-service</module>
+        <module>ysd-push-service</module>
+        <module>ysd-ai-service</module>
+    </modules>
+    <properties>
+        <!-- 目标字节码版本：Spring Boot 3.5 支持 17-25，这里取 21 -->
+        <java.version>21</java.version>
+
+        <mybatis.spring>3.0.5</mybatis.spring>
+        <commons.lang>2.6</commons.lang>
+        <druid>1.2.28</druid>
+        <pagehelper>2.1.1</pagehelper>
+        <aliyun.sdk.oss>3.18.5</aliyun.sdk.oss>
+        <knife4j>4.5.0</knife4j>
+        <!-- knife4j 4.5.0 与 Boot 3.5 组合下必须锁定 springdoc（否则抛 NoSuchMethodError: getGroupConfigs）。
+             swagger-annotations-jakarta 必须与 springdoc 2.8.17 传递的 swagger-core-jakarta 同版本，
+             低版本会因注解类缺少新方法而抛 NoSuchMethodError: Schema.$dynamicRef()。 -->
+        <springdoc>2.8.17</springdoc>
+        <swagger.annotations>2.2.47</swagger.annotations>
+        <jjwt>0.12.6</jjwt>
+        <fastjson2>2.0.65</fastjson2>
+        <wechatpay>0.6.0</wechatpay>
+        <!-- POI 不在 Spring Boot BOM 管理范围内，必须显式指定版本 -->
+        <poi>5.5.1</poi>
+        <!-- ShedLock 不在 Spring Boot BOM 管理范围内，必须显式指定版本（订单服务定时任务防重） -->
+        <shedlock>6.9.0</shedlock>
+        <!-- Spring AI：ysd-ai-service 的 Agent 能力底座（1.1.x 对齐 Boot 3.5.x） -->
+        <spring.ai>1.1.8</spring.ai>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <!-- 内部模块统一版本：消费模块不再各自硬编码 1.0-SNAPSHOT，避免版本漂移；
+                 写错版本会静默转去远程仓库查找（Could not find artifact），集中管理可杜绝。 -->
+            <dependency>
+                <groupId>com.ysd</groupId>
+                <artifactId>ysd-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ysd</groupId>
+                <artifactId>ysd-pojo</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ysd</groupId>
+                <artifactId>ysd-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mybatis.spring.boot</groupId>
+                <artifactId>mybatis-spring-boot-starter</artifactId>
+                <version>${mybatis.spring}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.fastjson2</groupId>
+                <artifactId>fastjson2</artifactId>
+                <version>${fastjson2}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>commons-lang</groupId>
+                <artifactId>commons-lang</artifactId>
+                <version>${commons.lang}</version>
+            </dependency>
+
+            <!-- Spring Boot 3 必须使用 -3-starter，旧的 druid-spring-boot-starter 在 Boot 3 下无法工作 -->
+            <dependency>
+                <groupId>com.alibaba</groupId>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
+                <version>${druid}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.pagehelper</groupId>
+                <artifactId>pagehelper-spring-boot-starter</artifactId>
+                <version>${pagehelper}</version>
+            </dependency>
+
+            <!-- Spring Boot 3 / Jakarta：springfox 已不可用，改用 springdoc OpenAPI3 -->
+            <dependency>
+                <groupId>com.github.xiaoymin</groupId>
+                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+                <version>${knife4j}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.swagger.core.v3</groupId>
+                <artifactId>swagger-annotations-jakarta</artifactId>
+                <version>${swagger.annotations}</version>
+            </dependency>
+
+            <!-- jjwt 0.12.x 拆分为 api / impl / jackson 三个构件 -->
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-api</artifactId>
+                <version>${jjwt}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-impl</artifactId>
+                <version>${jjwt}</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.jsonwebtoken</groupId>
+                <artifactId>jjwt-jackson</artifactId>
+                <version>${jjwt}</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.aliyun.oss</groupId>
+                <artifactId>aliyun-sdk-oss</artifactId>
+                <version>${aliyun.sdk.oss}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.wechatpay-apiv3</groupId>
+                <artifactId>wechatpay-apache-httpclient</artifactId>
+                <version>${wechatpay}</version>
+            </dependency>
+
+            <!-- poi -->
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi</artifactId>
+                <version>${poi}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>2025.0.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>com.alibaba.cloud</groupId>
+                <artifactId>spring-cloud-alibaba-dependencies</artifactId>
+                <version>2025.0.0.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- Spring AI 1.1.8：统一管理 spring-ai-starter-* 各构件版本 -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring.ai}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- ShedLock：定时任务分布式锁（ysd-order-service 用 Redis 存储） -->
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-spring</artifactId>
+                <version>${shedlock}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-provider-redis-spring</artifactId>
+                <version>${shedlock}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <!-- JDK 21 + Maven 3.9 下显式声明 Lombok 注解处理器，避免依赖 classpath 自动发现 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

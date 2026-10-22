@@ -1,0 +1,15 @@
+# 阻塞式问答（经网关 + 合法用户 token）2026-10-21
+
+$ curl -i -X POST http://localhost:9000/ai/drug/chat \
+    -H "authentication: <user-4-token>" \
+    -H "Content-Type: application/json; charset=UTF-8" \
+    --data-binary @.tmp-ai-req1.json
+
+HTTP/1.1 200 OK
+transfer-encoding: chunked
+X-Conversation-Id: a59b44a9-cf55-488a-bd9f-c8f38d0c45fc
+Content-Type: application/json
+Date: Wed, 21 Oct 2026 11:11:34 GMT
+
+{"code":1,"msg":null,"data":{"conversationId":"a59b44a9-cf55-488a-bd9f-c8f38d0c45fc","answer":"平台在售的阿莫西林是**阿莫西林胶囊**（石药集团中诺药业(石家庄)有限公司，国药准字H13023964），为**处方药**。\n\n平台收录的药品信息中，只记录了以下内容：\n- **适应症**：适用于敏感菌所致的上呼吸道感染（中耳炎、鼻窦炎、咽炎、扁桃体炎）、泌尿生殖道感染、皮肤软组织感染及急性支气管炎、肺炎等下呼吸道感染。\n- **禁忌**：青霉素过敏及青霉素皮肤试验阳性患者禁用。\n\n关于该药的具体**副作用（不良反应）清单**，平台药品数据中并未收录，我无法提供，建议查看药品说明书或咨询医师、药师。\n\n⚠️ 提醒：阿莫西林为处方药，需凭处方购买，请上传处方后再下单。"}}
+请求体文件 .tmp-ai-req1.json 内容：{"message":"阿莫西林有什么副作用"}

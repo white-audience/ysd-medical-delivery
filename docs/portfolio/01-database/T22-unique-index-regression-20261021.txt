@@ -1,0 +1,7 @@
+=== T22 唯一索引回归（事务内插入两行同 user/drug，第二行应失败）===
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1062 (23000) at line 1: Duplicate entry '4-46' for key 'shopping_cart.uk_user_drug'
+
+=== 事务结束后 cart 行数（应为 0）===
+cart_rows
+0

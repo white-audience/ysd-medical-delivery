@@ -1,0 +1,10 @@
+=== 2026-10-21 索引核对 ===
+TABLE_NAME	INDEX_NAME	cols	non_unique	visible
+drug	idx_drug_cat_status_time	category_id,status,create_time	1	YES
+drug	idx_drug_name	name	0	YES
+drug	idx_drug_status	status	1	NO
+drug	PRIMARY	id	0	YES
+shopping_cart	PRIMARY	id	0	YES
+shopping_cart	uk_user_drug	user_id,drug_id	0	YES
+dup_cart
+0

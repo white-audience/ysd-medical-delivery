@@ -1,0 +1,11 @@
+=== 孤儿订单明细清理（2026-10-21）===
+id	order_id	name
+5	5	急支糖浆
+6	5	复方甘草片
+7	5	黄连上清片
+deleted_orphans
+3
+orphan_details_after
+0
+detail_total_after
+26

@@ -1,0 +1,17 @@
+# 网关鉴权 401（无 token） 2026-10-21
+
+$ curl -i -X POST http://localhost:9000/ai/drug/chat -H "Content-Type: application/json" -d @.tmp-ai-req1.json
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+content-length: 60
+
+{"code":401,"msg":"未登录或登录已过期","data":null}
+
+# 网关鉴权 401（stream 无 token）
+
+$ curl -i -N -X POST http://localhost:9000/ai/drug/chat/stream -H "Content-Type: application/json" -d @.tmp-ai-req1.json
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+content-length: 60
+
+{"code":401,"msg":"未登录或登录已过期","data":null}

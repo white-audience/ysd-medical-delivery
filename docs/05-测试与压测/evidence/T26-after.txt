@@ -1,0 +1,106 @@
+T26 水平越权（IDOR）回归验证证据 —— 修复后
+====================================================
+测试时间：2026-10-21 19:02 (+08:00)
+修复版本：ysd-user-service 重新打包并重启（含 InnerAddressBookController 归属校验）
+测试环境：本地微服务全链路（gateway:9000 / user-service:8081 / order-service:8085）
+
+修复点：
+1. AddressBookMapper#getByIdAndUserId：SQL 改为 where id = #{id} and user_id = #{userId}
+2. InnerAddressBookController#getById：userId 取自 BaseContext
+   （由 InnerIdentityInterceptor 从 Feign 透传的 X-Identity-Id 写入），不再只按 id 查询
+3. 查不到归属时返回 Result.error("地址不存在或无权限")，order-service 的 unwrap 抛出业务异常
+
+一、回归前置
+----------------------------------------------------
+User B（user_id=5）重新加购 1 件药品，确保其购物车非空（排除“购物车为空”干扰）：
+mysql> select id,user_id,drug_id from shopping_cart where user_id in (4,5);
++-----+---------+---------+
+| id  | user_id | drug_id |
++-----+---------+---------+
+| 211 |       4 |      47 |
+| 212 |       5 |      48 |
++-----+---------+---------+
+
+修复后基线：
+mysql> select count(*) from orders;  --> 23
+mysql> select id,user_id from orders where user_id=5;  --> 仅历史越权单 40
+
+二、回归 1：User B 越权下单（预期失败）
+----------------------------------------------------
+POST http://127.0.0.1:9000/user/order/submit
+Content-Type: application/json
+authentication: <JWT userId=5>
+
+{"addressBookId":2,"payMethod":1,"remark":"T26-after-denied","deliveryStatus":1,"tablewareNumber":0,"tablewareStatus":1,"packAmount":0,"amount":4.00}
+
+响应：
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"code":0,"msg":"查询地址簿失败：地址不存在或无权限","data":null}
+
+内网接口直接验证（模拟 Feign，带 B 的身份头）：
+GET http://127.0.0.1:8081/inner/addressBook/2
+X-Identity-Id: 5
+
+HTTP/1.1 200
+{"code":0,"msg":"地址不存在或无权限","data":null}
+
+数据库结果：
+mysql> select count(*) from orders;  --> 23（未新增）
+mysql> select id,user_id,consignee,phone from orders where user_id=5 order by id desc;
++----+---------+-----------+-------------+
+| id | user_id | consignee | phone       |
++----+---------+-----------+-------------+
+| 40 |       5 | lisally   | 13212345678 |   <-- 修复前遗留的越权单，非本次新增
++----+---------+-----------+-------------+
+
+mysql> select id,user_id,drug_id from shopping_cart where user_id=5;  --> 212 仍存在（下单事务未执行）
+
+结论：User B 无法再使用 User A 的地址下单，且未产生新订单。
+
+三、回归 2：User A 使用自己的地址下单（预期成功）
+----------------------------------------------------
+POST http://127.0.0.1:9000/user/order/submit
+Content-Type: application/json
+authentication: <JWT userId=4>
+
+{"addressBookId":2,"payMethod":1,"remark":"T26-after-owner-ok","deliveryStatus":1,"tablewareNumber":0,"tablewareStatus":1,"packAmount":0,"amount":4.00}
+
+响应：
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"code":1,"msg":null,"data":{"id":41,"orderNumber":"1792580570218","orderAmount":4.00,"orderTime":"2026-10-21 19:02"}}
+
+内网接口直接验证：
+GET http://127.0.0.1:8081/inner/addressBook/2
+X-Identity-Id: 4
+
+HTTP/1.1 200
+{"code":1,"msg":null,"data":{"consignee":"lisally","phone":"13212345678"}}
+
+数据库结果：
+mysql> select count(*) from orders;  --> 24（新增 1 条，且归属正确）
+mysql> select id,number,user_id,consignee,phone,amount,remark
+       from orders where user_id in (4,5) order by id desc limit 4;
++----+---------------+---------+-----------+-------------+--------+--------------------+
+| id | number        | user_id | consignee | phone       | amount | remark             |
++----+---------------+---------+-----------+-------------+--------+--------------------+
+| 41 | 1792580570218 |       4 | lisally   | 13212345678 |   4.00 | T26-after-owner-ok |
+| 40 | 1792580467026 |       5 | lisally   | 13212345678 |   6.00 | T26-IDOR-test      |
+| 27 | 1791586423092 |       4 | lisally   | 13212345678 |  79.00 | NULL               |
+| 26 | 1791584592947 |       4 | lisally   | 13212345678 |  79.00 | NULL               |
++----+---------------+---------+-----------+-------------+--------+--------------------+
+
+结论：地址所有者携带自己的身份可正常下单，修复未破坏正常业务；
+order-service 的购物车清空、订单明细等既有逻辑均正常执行。
+
+四、修复前后对比
+----------------------------------------------------
+| 场景                                   | 修复前                          | 修复后                                      |
+|----------------------------------------|---------------------------------|---------------------------------------------|
+| B 传 A 的 addressBookId 下单           | 200，成功生成 B 的订单（id=40） | code=0，地址不存在或无权限，订单数不变      |
+| B 直接调内网 /inner/addressBook/2      | 返回 A 的收货人/电话            | code=0，地址不存在或无权限                  |
+| A 传自己的 addressBookId 下单          | 成功                            | 成功（id=41），行为一致                     |
+| 越权订单数（user_id=5 的异常单）       | 1（id=40）                      | 0（修复期间无新增）                         |

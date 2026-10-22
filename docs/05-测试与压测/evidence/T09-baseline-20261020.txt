@@ -1,0 +1,9 @@
+mysql: [Warning] Using a password on the command line interface can be insecure.
+orders_user4
+33
+order_detail_total
+40
+cart_user4
+1
+AUTO_INCREMENT
+37

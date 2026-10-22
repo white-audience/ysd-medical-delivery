@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ysd.mapper.DrugComboItemMapper">
+
+    <select id="getComboIdsByDrugIds" resultType="java.lang.Long">
+        select combo_id from drug_combo_item where drug_id in
+        <foreach collection="drugIds" item="drugId" separator="," open="(" close=")">
+            #{drugId}
+        </foreach>
+    </select>
+
+    <insert id="insertBatch" parameterType="list">
+        insert into drug_combo_item
+        (combo_id, drug_id, name, price, quantity)
+        values
+        <foreach collection="items" item="item" separator=",">
+            (#{item.comboId}, #{item.drugId}, #{item.name}, #{item.price}, #{item.quantity})
+        </foreach>
+    </insert>
+</mapper>

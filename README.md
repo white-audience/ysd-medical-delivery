@@ -144,8 +144,8 @@
 ```mermaid
 flowchart TB
     subgraph CLIENT[客户端]
-        WEB[管理端 Web]
-        MP[微信小程序]
+        WEB["管理端 Web"]
+        MP["微信小程序"]
     end
 
     WEB --> GW
@@ -173,13 +173,13 @@ flowchart TB
     AI -->|"Tool Calling: Feign /inner/drug/**"| CATALOG
 
     subgraph AGENT[AI Agent 内部链路]
-        TOOL[DrugQueryTool<br/>@Tool 药品查询]
-        CHAT[ChatClient<br/>DeepSeek deepseek-chat]
-        MEM[MessageWindowChatMemory<br/>20 条窗口记忆]
-        RAG[QuestionAnswerAdvisor<br/>RAG 检索]
-        VEC[(Redis Stack<br/>ysd_rag_idx 向量索引)]
-        EMB[Ollama bge-m3<br/>1024 维 Embedding]
-        PRESET[处方药审核<br/>Java 固定步骤编排]
+        TOOL["DrugQueryTool<br/>@Tool 药品查询"]
+        CHAT["ChatClient<br/>DeepSeek deepseek-chat"]
+        MEM["MessageWindowChatMemory<br/>20 条窗口记忆"]
+        RAG["QuestionAnswerAdvisor<br/>RAG 检索"]
+        VEC[("Redis Stack<br/>ysd_rag_idx 向量索引")]
+        EMB["Ollama bge-m3<br/>1024 维 Embedding"]
+        PRESET["处方药审核<br/>Java 固定步骤编排"]
     end
 
     AI --> TOOL
@@ -191,11 +191,11 @@ flowchart TB
     VEC -.->|"文档向量化"| EMB
 
     subgraph INFRA[基础设施]
-        NACOS[(Nacos 3.0.3<br/>注册 / 配置 / 流控规则)]
-        MYSQL[(MySQL 8.0<br/>ysd_take_out)]
-        REDIS[(Redis Stack<br/>业务缓存 db10 / 向量 db0)]
-        MQ[(RabbitMQ<br/>异步推送)]
-        ZIPKIN[(Zipkin<br/>链路追踪)]
+        NACOS[("Nacos 3.0.3<br/>注册 / 配置 / 流控规则")]
+        MYSQL[("MySQL 8.0<br/>ysd_take_out")]
+        REDIS[("Redis Stack<br/>业务缓存 db10 / 向量 db0")]
+        MQ[("RabbitMQ<br/>异步推送")]
+        ZIPKIN[("Zipkin<br/>链路追踪")]
     end
 
     SVC -.-> INFRA

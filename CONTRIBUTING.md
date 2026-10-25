@@ -17,6 +17,10 @@ mvn -q -pl ysd-order-service -am -DskipTests package
 - Java 21 / Spring Boot 3.5.x，保持现有模块边界与 `Result` 返回风格。
 - 新增接口请补充 OpenAPI 注解；涉及鉴权的路径要确认网关白名单是否需要调整。
 - 不要提交真实密钥；本地配置写进 `.env`（已被忽略）。
+- `mvn test` 会执行 `@Tag("bug-evidence")` 的**预期失败**用例（订单状态机非法回退、重复支付等已知缺陷留证），
+  它们不是回归失败；只想跑通过用例时加 `-DexcludedGroups=bug-evidence`。
+- 用 `-pl` 单独构建或测试时务必带 `-am`，否则可能解析到本地仓库里的旧版 `ysd-pojo` / `ysd-api`
+  （典型表现为 `NoSuchMethodError`）。
 
 ## 管理端（ysd-admin-web）
 
@@ -29,8 +33,8 @@ npm run build
 
 ## 小程序（ysd-miniapp）
 
-当前开源发布包**不包含** `ysd-miniapp/`：课程版源码的再分发授权尚未确认。
-取得书面许可后再纳入；在此之前不要向公开仓库提交该目录。
+当前开源发布包**不包含** `ysd-miniapp/`：该目录源码的再分发授权尚未确认，来源与授权状态见
+[NOTICE.md](NOTICE.md)。取得权利人的书面许可后再纳入；在此之前不要向公开仓库提交该目录。
 （原始开发副本的启动方式见其自带的 `ysd-miniapp/README.md`。）
 
 ## 文档

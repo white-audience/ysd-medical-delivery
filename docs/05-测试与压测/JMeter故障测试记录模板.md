@@ -7,8 +7,8 @@
 ## 0. 通用信息（所有测试共用）
 
 - 测试环境：独立测试环境（本地 / 独立；**故障注入不得在生产执行**）
-- 平台版本：药速达智慧配送平台（ysd-take-out）
-- 服务与端口：网关 9000 / user 8081 / admin 8082 / report 8083 / catalog 8084 / order 8085 / push 8086
+- 平台版本：药速达（ysd-take-out）· 医药即时配送平台
+- 服务与端口：网关 9000 / user 8081 / admin 8082 / report 8083 / catalog 8084 / order 8085 / push 8086 / ai 8088
 - 中间件：Nacos 8848 · MySQL 3306（库 ysd_take_out）· Redis 6379（业务库 **db10**）· RabbitMQ 5672 · Zipkin 9411
 - 数据库连接池：**Druid**（不是 HikariCP）
 - 工具：JMeter 5.6+ / JDK 17+

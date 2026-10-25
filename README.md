@@ -1,7 +1,8 @@
 # 药速达（ysd-take-out）—— 基于 Spring Cloud + Spring AI 的医药即时配送平台
 
-> 一个面向医药即时零售场景的微服务项目：管理端 + 微信小程序用户端，覆盖药品目录、购物车、下单支付、
-> 订单履约、WebSocket 来单提醒与运营报表；并接入 **Spring AI Agent**，提供药品查询、用药咨询与处方药合规审核能力。
+> 药速达是一个面向**医药即时零售与同城即时配送**场景的平台：管理端负责药品目录、订单履约与运营统计，
+> 用户端提供药品浏览、购物车、下单与订单跟踪；平台侧通过 **Spring Cloud** 完成服务治理，通过 **Spring AI**
+> 提供药品查询、用药咨询、规则检索与处方药合规审核能力。
 
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
@@ -29,37 +30,89 @@
 
 ## 项目亮点
 
-### 1. 医药化重构，告别外卖语义
+### 1. 药品业务建模与数据设计
 
-项目由通用外卖系统深度改造为医药即时配送平台，业务语义贯穿数据库、Java 代码、REST/Feign 接口、
-Redis Key、前端与文档：
+**业务场景**：医药即时配送的商品信息既要支撑选购与下单，又要承载强监管字段（处方属性、批准文号、
+适应症、禁忌），还要被 AI 用药咨询与合规审核复用。
 
-| 原语义 | 医药化后 | 说明 |
-|---|---|---|
-| `dish` | `drug` | 菜品 → 药品 |
-| `setmeal` | `drug_combo` | 套餐 → 药品组合 |
-| `dish_flavor` | `drug_spec` | 口味 → 药品规格 |
-| `sky_take_out` | `ysd_take_out` | 数据库重命名 |
-| 餐饮提示语 | 处方药提示 | 处方药必须上传处方后购买 |
+**实现方案**：按「分类 → 药品 → 规格 → 药品组合」建立领域模型，并让数据库、Java 实体、REST/Feign
+接口与 Redis 缓存共用同一套药品语义：
 
-药品域新增 `prescription_type`（OTC / 处方药）、`manufacturer`（生产厂家）、`approval_number`（批准文号）、
-`indications`（适应症）、`contraindications`（禁忌）等字段，为 AI 问答与合规审核提供结构化数据基础。
+| 业务对象 | 表 / 实体 | 关键字段 | 当前用途 |
+|---|---|---|---|
+| 药品分类 | `category` | 名称、类型、排序、状态 | 管理端维护、用户端分类浏览 |
+| 药品 | `drug` / `Drug` | 名称、价格、图片、描述、上下架状态 | 目录展示、加购时取快照 |
+| 药品规格 | `drug_spec` / `DrugSpec` | 规格名称、规格取值列表 | 同一药品的包装 / 剂量选择 |
+| 药品组合 | `drug_combo` + `drug_combo_item` | 组合名称、组合价、包含药品与数量 | 打包销售与组合价维护 |
+
+在通用商品属性之外，药品实体补充了医药场景必需的结构化字段：
+`prescription_type`（0 = OTC 非处方药 / 1 = 处方药）、`manufacturer`（生产厂家）、
+`approval_number`（批准文号）、`indications`（适应症）、`contraindications`（禁忌）。
+这些字段在 `Drug`、`DrugDTO`/`DrugVO`、跨服务传输的 `DrugInfoDTO` 与 `/inner/drug/**` 内部接口中保持一致，
+使选购、下单与 AI 共用同一份药品事实。缓存同样按药品维度组织：
+`ysd:catalog:drug:{categoryId}`、`ysd:catalog:combo:{categoryId}`、`ysd:catalog:category:{type}`。
+
+**处方属性与购买合规**：`prescription_type` 是两条链路的共同判据。
+
+- **下单链路（同步、确定性）**：`order-service` 在写订单前调用
+  `POST /inner/ai/check-prescription`。`PrescriptionAuditService` 先按药品 ID 取处方属性，
+  购物车不含处方药直接放行；含处方药时必须携带处方凭证，否则拦截。
+  药品查询失败、审核服务超时或熔断一律拒绝下单（fail-closed），不做“先放行后补审”。
+- **咨询链路（RAG + 生成）**：`GET /ai/prescription/check` 先查药品事实，OTC 直接返回可购买；
+  处方药则检索平台《处方药购买规则》并生成审核通知。检索为空时直接返回错误、不调用模型——
+  没有依据的生成只能是编造。
+
+**验证**：字段、接口与两条链路均在源码中落地；下单链路的拒单、超时与宕机分支由
+`OrderPrescriptionAuditTest` 与 [T31 AI 失败路径测试](docs/05-测试与压测/T31-AI失败路径测试记录.md) 覆盖。
 
 ### 2. 智能 Agent：Tool Calling + RAG + ChatMemory
 
-`ysd-ai-service` 基于 **Spring AI 1.1.8** 构建，不是简单的“套壳聊天”：
+`ysd-ai-service` 基于 **Spring AI 1.1.8** 构建，把药品事实、平台规则与大模型生成组合在一起：
 
 - **Tool Calling**：`DrugQueryTool` 通过 `@Tool` 暴露药品查询能力，模型自主决定是否调用，
-  再由 Feign 访问 `catalog-service` 的真实药品数据；药品事实以工具返回为准。
-- **RAG**：Markdown 知识库经 `TokenTextSplitter` 切分，由本地 **Ollama bge-m3** 向量化，
-  写入 **Redis Stack** 向量索引；`QuestionAnswerAdvisor` 以 `topK=4`、相似度阈值 `0.5` 检索平台规则与项目知识。
-- **ChatMemory**：`MessageWindowChatMemory` 保留最近 20 条消息，通过 `conversationId` 支持多轮对话。
+  再经 Feign 访问 `catalog-service` 的 `/inner/drug/search`；适应症、禁忌、处方属性等事实以工具返回为准。
+- **RAG**：8 份医药业务知识文档（处方药购买规则、OTC 与处方药分类、用药禁忌与相互作用、
+  特殊人群用药、储存与冷链等）经 `TokenTextSplitter` 切分，由本地 **Ollama bge-m3** 向量化，
+  写入 **Redis Stack** 向量索引 `ysd_rag_idx`；`QuestionAnswerAdvisor` 以 `topK=4`、相似度阈值 `0.5`
+  检索平台规则。
+- **ChatMemory**：`MessageWindowChatMemory` 保留最近 20 条消息，记忆键按「用户 + conversationId」
+  隔离，跨用户复用同一会话 ID 也读不到对方历史。
 - **确定性编排**：处方药审核接口不使用“让模型自行规划”的方式，而是由 Java 代码固定执行
   “查药品 → 判断处方属性 → RAG 检索规则 → 生成审核通知”，保证严肃业务的执行顺序与结果确定性。
-- **安全护栏**：Prompt 明确要求“工具和文档没有的信息不得编造”；处方药必须提示上传处方；
-  接口接入 Sentinel 限流，防止恶意刷取导致 Token 消耗失控。
+- **安全护栏**：系统提示词要求工具与文档没有的信息不得编造；处方药必须提示上传处方；
+  接口接入 Sentinel 限流，防止刷取导致 Token 消耗失控；空输入与超长输入在进入模型前即被拒绝。
 
-### 3. 容器化一键部署
+**验证**：T31 覆盖空输入、工具异常、RAG 空召回、跨用户记忆隔离与处方审核 fail-closed；RAG 侧另有 20 题离线评测
+（[检索设计与评测](docs/02-架构设计与开发/AI-RAG检索设计与评测.md)）。
+
+### 3. 微服务治理
+
+- **Nacos**：服务注册发现、配置中心、Sentinel 网关流控规则持久化；
+- **Gateway**：7 条业务路由统一入口，JWT 校验后注入 `X-Identity-Id`；路由前无条件剥离客户端
+  伪造的同名头，服务端拦截器再兜底一层，兼容绕过网关的直连场景；
+- **OpenFeign**：跨服务只读调用 + `fallbackFactory` 降级；`/inner/**` 内部接口不经网关暴露，
+  AI 服务对 catalog 单独配置 1s 连接 / 2s 读取超时，依赖不可用时快速失败；
+- **Sentinel**：网关 `gw-flow` 限流 + AI 接口方法级 `@SentinelResource` 资源限流；
+- **Zipkin + Micrometer Tracing**：网关与业务服务统一 traceId 日志格式，支持全链路追踪；
+- **ShedLock**：订单超时关闭、派送完成两个定时任务使用 Redis 分布式锁，避免多实例重复执行；
+- **RabbitMQ + WebSocket**：来单提醒、催单等消息经 fanout 交换机广播，各推送实例独立消费。
+
+### 4. 数据一致性、缓存与并发安全
+
+- **10 万条药品数据**保留为长期压测基线，覆盖分页、缓存与索引验证；
+- **并发重复加购**：JMeter 50 并发复现出 50 条重复购物车行，新增
+  `shopping_cart.uk_user_drug (user_id, drug_id)` 从数据库层兜住重复写入，同压测条件下
+  `COUNT(*) = 1`（T22 复现 → 修复 → 回归）；
+- **缓存防护**：空值缓存防穿透、本地互斥锁防击穿、TTL 随机偏移防雪崩；写操作提交后延迟双删，
+  失效统一走 `SCAN` 而非 `KEYS`，避免阻塞 Redis；
+- **锁与死锁演练**：T08/T09 用双会话复现锁等待，借 `SHOW ENGINE INNODB STATUS` 定位等待链并沉淀排查 SQL；
+- **索引优化**：补充 `(category_id, status, create_time)` 复合索引消除 index_merge 与 filesort
+  （89 ms → 34 ms），把低基数 `idx_drug_status` 设为 INVISIBLE 让模糊查询回到全表扫描；
+- **连接池观测**：压测期间采集 Druid 活跃连接、等待线程与慢 SQL，形成可复现证据（T06）；
+- 相关 SQL 与结论见 `docs/04-运维与故障排查/003_database_optimization_and_fixes.sql` 与
+  [docs/portfolio/01-database/](docs/portfolio/01-database/)。
+
+### 5. 容器化一键部署
 
 提供多阶段构建的通用 `Dockerfile`（`MODULE` 构建参数复用给任意微服务）与 `docker-compose.yml`：
 
@@ -72,25 +125,15 @@ Redis Key、前端与文档：
 > 通用 Dockerfile 支持 `--build-arg MODULE=ysd-order-service` 等方式构建其余业务服务镜像；
 > 当前 Compose 只编排了基础设施与 catalog / AI 两个核心服务，详见[当前状态与边界](#当前状态与边界)。
 
-### 4. 全链路治理
+### 6. 可复现的测试与排障证据
 
-- **Nacos**：服务注册发现、配置中心、Sentinel 网关流控规则持久化；
-- **Sentinel**：网关 `gw-flow` 限流 + AI 接口 `@SentinelResource` 资源限流；
-- **Zipkin + Micrometer Tracing**：网关与业务服务统一 traceId 日志格式，支持全链路追踪；
-- **OpenFeign**：跨服务调用，AI 服务配置短超时，catalog 不可用时快速失败；
-- **ShedLock**：订单超时 / 派送定时任务使用 Redis 分布式锁，避免多实例重复执行；
-- **JWT 双端鉴权**：网关统一校验并剥离客户端伪造的身份头，服务端拦截器兼容直连绕过网关的场景；
-- **RabbitMQ + WebSocket**：来单提醒、催单等异步推送。
-
-### 5. 数据库优化与并发安全
-
-- **10 万条药品数据**保留为长期压测基线，覆盖分页、缓存与索引验证；
-- **购物车唯一索引**：`shopping_cart.uk_user_drug (user_id, drug_id)` 消除并发重复加购，
-  经 JMeter 并发复现、修复、回归三阶段验证（T22）；
-- **锁与死锁演练**：T08/T09 通过双会话复现锁等待、分析 `INNODB STATUS`，并沉淀排查 SQL；
-- **Druid 连接池观测**：压测期间采集活跃连接、等待线程与慢 SQL，形成可复现证据（T06）；
-- **索引优化与数据清理脚本**：`docs/04-运维与故障排查/003_database_optimization_and_fixes.sql`
-  与药品表索引建议，均已归档到 `docs/portfolio/01-database/`。
+- **压测与故障演练**：JMeter 计划覆盖缓存命中 / 穿透 / 延迟双删、Feign 熔断、网关限流、
+  连接池耗尽、并发加购与 MQ 行为观察；
+- **安全**：T26 复现水平越权（IDOR）→ 修复 → 回归，越权请求返回无权限、订单数不变；
+- **AI 失败路径**：T31 覆盖空输入、工具异常、RAG 空召回、跨用户记忆隔离与处方审核 fail-closed；
+- **RAG 评测**：20 题自建评测集，15 道可回答题 Hit Rate@4 = 100%，并验证阈值 0.8 会掉到 13/15；
+- 原始输出与截图统一索引在 [docs/portfolio/README.md](docs/portfolio/README.md)，可逐条回溯到
+  对应测试记录。
 
 ---
 
@@ -214,6 +257,10 @@ drugName
              → 生成合规审核通知
 ```
 
+> 下单链路的处方审核是另一条链路：`order-service` 调用内网 `POST /inner/ai/check-prescription`，
+> 由 `PrescriptionAuditService` 只做确定性判断（是否含处方药、是否带处方凭证），不调用模型，
+> 以满足下单接口的同步耗时要求；任何异常都按 fail-closed 拦截。
+
 ---
 
 ## 技术栈
@@ -265,7 +312,7 @@ ysd-take-out/
 ├── ysd-miniapp/             # 用户端小程序（当前开源发布包未包含，授权待确认）
 ├── docker/mysql/init/       # MySQL 首次启动自动建表
 ├── docker/nginx/            # 管理端 Nginx 反代示例
-├── scripts/                 # 一键启动、开源导出等脚本
+├── scripts/                 # 开源导出脚本（一键启停见根目录 start-all.sh / stop-all.sh）
 ├── docker-compose.yml       # 基础设施 + catalog + AI 一键编排
 ├── Dockerfile               # 多阶段构建，MODULE 参数复用
 ├── SECURITY.md              # 安全策略与部署加固清单
@@ -477,8 +524,8 @@ npm run serve
 
 ### 7. 用户端小程序（当前发布包未包含）
 
-当前开源发布包**不包含** `ysd-miniapp/`：该目录由课程配套工程迁移而来，再分发授权尚未确认。
-取得课程作者或权利人的书面许可后，再将其纳入发布并更新 NOTICE。
+当前开源发布包**不包含** `ysd-miniapp/`：该目录源码的再分发授权尚未确认，
+来源与授权状态见 [NOTICE.md](NOTICE.md)。取得权利人的书面许可后，再将其纳入发布并更新 NOTICE。
 
 若你已从授权版本获得该目录，启动方式如下：
 
@@ -577,14 +624,21 @@ curl -G "http://localhost:9000/ai/prescription/check" \
 
 为避免“设计目标”与“已落地代码”混淆，明确当前边界：
 
-- 微服务拆分已完成，原单体 `ysd-server` 已删除，现为网关 + 7 个业务服务；
+- 服务已按业务域全部拆分完成：网关 + 7 个业务服务
+  （user / admin / report / catalog / order / push / ai），仓库内不再保留单体运行模块；
 - 仍采用**共享数据库 + 共享 Redis db10** 的过渡架构，尚未做数据库垂直拆分；
+- 订单表保留少量早期字段命名（`tableware_*`），尚未重命名；本次仅整改文档，
+  未改动表结构、实体与接口；
 - `docker-compose.yml` 当前覆盖 **Nacos / MySQL / Redis Stack / catalog / AI**，
   其余业务服务需本机启动或自行扩展 Compose；
 - Compose 未内置 Zipkin 与 RabbitMQ；为便于首次启动，容器内默认关闭 tracing
   （`MANAGEMENT_TRACING_ENABLED=false`），宿主机启动 Zipkin 后可重新开启；
 - AI 对话依赖 DeepSeek API Key，RAG 依赖宿主机 Ollama 与 `bge-m3` 模型；
-- 微信支付、微信登录、阿里云 OSS 等能力需要自行配置真实凭据后才能联调；
+- 支付当前是**演示实现**：`OrderServiceImpl.payment()` 未调用微信支付，而是直接构造 `ORDERPAID` 并更新
+  订单状态（真实 `weChatPayUtil.pay(...)` 代码处于注释状态）；微信登录与阿里云 OSS 需要配置真实凭据
+  后才能联调；
+- 订单状态机尚未补齐前置状态校验：`confirm` / `cancel` 可从「已完成」回退，`payment` 未校验订单状态
+  （对应 `OrderStateMachineTest` 中 `@Tag("bug-evidence")` 的预期失败用例，作为缺陷留证保留）；
 - 用户端小程序当前**未纳入开源发布包**（授权待确认）。即使取得该目录，以下功能后端也未实现：
   购物车修改数量与删除、商家电话、订单按支付状态筛选；
 - 业务服务默认只监听 `127.0.0.1`，容器内通过 `SERVER_ADDRESS=0.0.0.0` 覆盖；仅网关需要对外暴露，
@@ -598,9 +652,10 @@ curl -G "http://localhost:9000/ai/prescription/check" \
 | 文档 | 内容 |
 |---|---|
 | [docs/README.md](docs/README.md) | 全部文档的分类入口与阅读路线 |
+| [项目全景图](docs/01-项目概览/01-项目全景图.md) | 业务角色、功能清单、技术栈与源码依据 |
 | [作品集证据索引](docs/portfolio/README.md) | 数据库 / 安全 / AI / RAG 评测的核心证据 |
-| [微服务改造方案](docs/02-架构设计与开发/微服务改造方案.md) | 拆分方案、难点与风险 |
-| [微服务改造全记录](docs/02-架构设计与开发/微服务改造全记录.md) | 改造过程与踩坑记录 |
+| [微服务改造方案](docs/02-架构设计与开发/微服务改造方案.md) | 服务拆分边界、通信方式与迁移风险 |
+| [微服务改造全记录](docs/02-架构设计与开发/微服务改造全记录.md) | 分阶段实施记录、服务清单与踩坑 |
 | [AI-RAG 检索设计与评测](docs/02-架构设计与开发/AI-RAG检索设计与评测.md) | 20 题评测、召回率与阈值调优 |
 | [AI 接入网关与 SSE 改造](docs/02-架构设计与开发/AI接入网关与SSE改造记录.md) | 鉴权、流式输出与阻塞改造 |
 | [源码导航地图](docs/03-源码学习/02-源码导航地图.md) | 按业务链路定位代码 |
@@ -619,8 +674,6 @@ curl -G "http://localhost:9000/ai/prescription/check" \
 
 ## 致谢
 
-- 本项目最初孵化于 **黑马程序员《苍穹外卖》** 教学项目，感谢原项目提供的业务原型与学习素材；
-  当前版本已在业务语义、技术栈、架构与 AI 能力上进行了大幅重构。
 - 感谢 [Spring](https://spring.io/) 生态：Spring Boot、Spring Cloud、Spring Cloud Alibaba、**Spring AI**。
 - 感谢 [Nacos](https://nacos.io/)、[Sentinel](https://sentinelguard.io/)、[Zipkin](https://zipkin.io/)、
   [Redis](https://redis.io/)、[RabbitMQ](https://www.rabbitmq.com/)。

@@ -1,4 +1,4 @@
-# Yaosuda (ysd-take-out) — An Instant Medical Retail & Delivery Platform Built with Spring Cloud + Spring AI
+# YSD Medical Delivery (ysd-take-out) - Spring Cloud + Spring AI
 
 *[简体中文](./README.md) | English*
 
@@ -12,22 +12,22 @@
 
 ## Overview
 
-Yaosuda (ysd-take-out) is a **microservices-based platform for instant medical retail**: a pharmacy operator curates
-the drug catalog in the admin console, customers browse and order from a WeChat Mini Program, and the platform
-pushes each order to the store for acceptance and delivery. The system covers the full
-"browse → cart → checkout → payment → acceptance → delivery → completion" fulfillment path, with prescription
-compliance checks at the critical steps.
+YSD Medical Delivery (ysd-take-out) is a **microservices-based platform for instant medical retail**: a pharmacy
+operator curates the drug catalog in the admin console, customers browse and order from a WeChat Mini Program, and
+the platform pushes each order to the store for acceptance and delivery. The system models the end-to-end
+"browse → cart → checkout → payment → acceptance → delivery → completion" flow, with prescription compliance
+checks at the critical steps.
 
 The backend is split into a gateway plus seven domain services. **Spring Cloud** provides the operational
 backbone (Nacos discovery, Gateway routing, OpenFeign, Sentinel, ShedLock, Zipkin), while **Spring AI** powers
 drug lookup, medication consultation, rule retrieval and prescription compliance review through tool calling,
 RAG and conversation memory.
 
-> **Scope and status.** All performance and test figures in this repository come from a local single-node
-> environment, not from a production cluster. Payment is a demo implementation (the real WeChat Pay call is
-> commented out), the WeChat Mini Program is excluded from this release pending redistribution authorization, and
-> a few order-state transitions are not guarded yet (tracked by intentionally failing `bug-evidence` tests). The
-> Chinese README keeps the complete boundary list.
+> **Scope and status.** All performance and test figures in this repository come from a local single-node,
+> single-instance environment, not from a production cluster or a production measurement. Payment is a demo
+> implementation (the real WeChat Pay call is commented out), the WeChat Mini Program is excluded from this
+> release pending redistribution authorization, and a few order-state transitions are not guarded yet (tracked by
+> intentionally failing `bug-evidence` tests). A complete boundary list follows below.
 
 The in-depth documentation — architecture decisions, source walkthroughs, troubleshooting playbooks and raw test
 evidence — is currently written in Chinese and lives under [docs/](./docs/README.md).
@@ -96,8 +96,9 @@ outage branches of the checkout path are covered by `OrderPrescriptionAuditTest`
   to cap token spend; empty and over-long inputs are rejected before the model is invoked.
 
 **Verification.** T31 covers empty input, tool failure, empty RAG retrieval, cross-user memory isolation and
-fail-closed prescription review; a separate 20-question offline evaluation covers RAG quality
-([retrieval design & evaluation](docs/02-架构设计与开发/AI-RAG检索设计与评测.md)).
+fail-closed prescription review; a separate local, single-instance 20-question offline evaluation covers RAG
+quality: Hit Rate@4 was 15/15 (100%) on the 15 answerable questions, and raising the similarity threshold to 0.8
+dropped it to 13/15 ([retrieval design & evaluation](docs/02-架构设计与开发/AI-RAG检索设计与评测.md)).
 
 ### 3. Microservices Governance
 
@@ -129,16 +130,16 @@ fail-closed prescription review; a separate 20-question offline evaluation cover
 
 ### 5. Database Optimization & Concurrency Safety
 
-- **100,000 drug rows** are kept as a long-running load-test baseline for pagination, cache and index
+- **100,000 drug rows** are kept as a local long-running load-test baseline for pagination, cache and index
   verification.
-- **Concurrent add-to-cart.** A 50-thread JMeter run produced 50 duplicate cart rows; the unique index
-  `shopping_cart.uk_user_drug (user_id, drug_id)` now makes the database the last line of defense, and the same
-  load yields `COUNT(*) = 1` (T22: reproduce → fix → regression).
+- **Concurrent add-to-cart (local single-instance load test).** A 50-thread JMeter run produced 50 duplicate cart
+  rows; the unique index `shopping_cart.uk_user_drug (user_id, drug_id)` now makes the database the last line of
+  defense, and the same load yields `COUNT(*) = 1` (T22: reproduce → fix → regression).
 - **Lock and deadlock drills.** T08 / T09 reproduce lock waits with two MySQL sessions, locate the wait chain
   through `SHOW ENGINE INNODB STATUS`, and keep the diagnostic SQL as a reusable playbook.
 - **Index optimization.** A composite `(category_id, status, create_time)` index removed an `index_merge` plus
-  filesort plan (89 ms → 34 ms), and the low-cardinality `idx_drug_status` was set `INVISIBLE` so fuzzy
-  searches fall back to a full scan instead of millions of random lookups.
+  filesort plan (measured locally on a single instance: 89 ms → 34 ms), and the low-cardinality `idx_drug_status`
+  was set `INVISIBLE` so fuzzy searches fall back to a full scan instead of a large number of random lookups.
 - **Connection-pool observability.** Druid active connections, waiting threads and slow SQL are captured under
   load (T06).
 
@@ -274,7 +275,7 @@ ysd-take-out/
 ├── ysd-miniapp/             # customer mini program (not included in this release)
 ├── docker/mysql/init/       # schema loaded on first MySQL startup
 ├── docker/nginx/            # sample Nginx reverse proxy for the admin console
-├── scripts/                 # open-source export script
+├── scripts/                 # open-source export and start/stop scripts
 ├── docker-compose.yml       # infrastructure + catalog + AI
 ├── Dockerfile               # multi-stage build, reusable via MODULE
 ├── SECURITY.md              # security policy and hardening checklist
@@ -506,6 +507,52 @@ Reuse the `conversationId` returned by the first call to continue the same conve
 docker compose down       # stop containers, keep volumes
 docker compose down -v    # stop and delete MySQL / Redis / Nacos data
 ```
+
+---
+
+## Current Status & Boundaries
+
+To keep design goals separate from shipped code, the current boundaries are:
+
+- All services are split by domain: a gateway plus seven business services
+  (user / admin / report / catalog / order / push / ai); no monolith runtime module remains in the repository.
+- The architecture is still transitional: one shared MySQL database (`ysd_take_out`) and one shared Redis db10;
+  the database has not been split vertically.
+- A few early order-table columns keep the legacy `tableware_*` names. The recent cleanup was documentation-only
+  and did not change schemas, entities or APIs.
+- `docker-compose.yml` currently covers **Nacos / MySQL / Redis Stack / catalog / AI**; gateway / user / admin /
+  report / order / push must run on the host or be added to Compose manually.
+- Compose does not bundle Zipkin or RabbitMQ. Tracing is disabled by default inside the containers
+  (`MANAGEMENT_TRACING_ENABLED=false`); start Zipkin on the host and re-enable it if needed.
+- AI chat needs a DeepSeek API key; RAG needs Ollama and the `bge-m3` model on the host.
+- Payment is a **demo implementation**: `OrderServiceImpl.payment()` does not call WeChat Pay; it constructs
+  `ORDERPAID` and updates the order directly (the real `weChatPayUtil.pay(...)` call is commented out). WeChat
+  login and Alibaba Cloud OSS require real credentials before integration testing.
+- The order state machine does not yet guard all transitions: `confirm` / `cancel` can move an order back from
+  "completed", and `payment` does not validate order state. These are kept as intentionally failing
+  `@Tag("bug-evidence")` cases in `OrderStateMachineTest`.
+- The customer Mini Program is **not part of this release** (redistribution authorization pending). Even with the
+  directory, the backend does not implement cart quantity update/delete, shop phone, or filtering orders by
+  payment status.
+- Business services bind `127.0.0.1` by default and use `SERVER_ADDRESS=0.0.0.0` in containers. Only the gateway
+  should be exposed; **do not publish 8081–8088 to the internet**. The gateway unconditionally strips any
+  client-supplied `X-Identity-Id` before validating the JWT and injecting the trusted identity header.
+
+---
+
+## Security
+
+- **No sensitive data is shipped**: the repository and its Git history contain no real keys, certificates or
+  production credentials; all sensitive configuration is injected through environment variables, and
+  `.env.example` contains placeholders only.
+- `.env` and `.env.*` are excluded by `.gitignore` (only `.env.example` is tracked); logs, certificates,
+  load-test artifacts and frontend build output are excluded as well.
+- This audit scanned the working tree and Git history for common secret patterns; no real credentials were found.
+  Report any suspected leak privately via [SECURITY.md](./SECURITY.md), not in a public issue.
+- JWTs in the test evidence are short-lived local development tokens (already expired) signed with local default
+  secrets; the test data contains no real user phone numbers, addresses or production credentials.
+- Business services bind `127.0.0.1` by default and only the gateway should be public. Production deployments must
+  replace demo secrets and default passwords and restrict public access to Swagger / Actuator.
 
 ---
 

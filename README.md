@@ -1,4 +1,4 @@
-# 药速达（ysd-take-out）—— 基于 Spring Cloud + Spring AI 的医药即时配送平台
+# 药速达（ysd-medical-delivery）—— 基于 Spring Cloud + Spring AI 的医药即时配送平台
 
 > 药速达是一个面向**医药即时零售与同城即时配送**场景的平台：管理端负责药品目录、订单履约与运营统计，
 > 用户端提供药品浏览、购物车、下单与订单跟踪；平台侧通过 **Spring Cloud** 完成服务治理，通过 **Spring AI**
@@ -6,6 +6,7 @@
 
 ![Java](https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)
+![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2025.0.0-6DB33F?logo=spring&logoColor=white)
 ![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.8-6DB33F?logo=spring&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
@@ -24,6 +25,7 @@
 - [AI 接口体验](#ai-接口体验)
 - [演示与证据截图](#演示与证据截图)
 - [当前状态与边界](#当前状态与边界)
+- [安全声明](#安全声明)
 - [文档导航](#文档导航)
 - [致谢](#致谢)
 - [License](#license)
@@ -84,8 +86,8 @@
 - **安全护栏**：系统提示词要求工具与文档没有的信息不得编造；处方药必须提示上传处方；
   接口接入 Sentinel 限流，防止刷取导致 Token 消耗失控；空输入与超长输入在进入模型前即被拒绝。
 
-**验证**：T31 覆盖空输入、工具异常、RAG 空召回、跨用户记忆隔离与处方审核 fail-closed；RAG 侧另有 20 题离线评测
-（[检索设计与评测](docs/02-架构设计与开发/AI-RAG检索设计与评测.md)）。
+**验证**：T31 覆盖空输入、工具异常、RAG 空召回、跨用户记忆隔离与处方审核 fail-closed；RAG 侧另有
+本地单实例 20 题离线评测（[检索设计与评测](docs/02-架构设计与开发/AI-RAG检索设计与评测.md)）。
 
 ### 3. 微服务治理
 
@@ -101,24 +103,25 @@
 
 ### 4. 数据一致性、缓存与并发安全
 
-- **10 万条药品数据**保留为长期压测基线，覆盖分页、缓存与索引验证；
-- **并发重复加购**：JMeter 50 并发复现出 50 条重复购物车行，新增
+- **10 万条药品数据**保留为本地长期压测基线，覆盖分页、缓存与索引验证；
+- **并发重复加购（本地环境压测，单实例）**：JMeter 50 并发复现出 50 条重复购物车行，新增
   `shopping_cart.uk_user_drug (user_id, drug_id)` 从数据库层兜住重复写入，同压测条件下
   `COUNT(*) = 1`（T22 复现 → 修复 → 回归）；
 - **缓存防护**：空值缓存防穿透、本地互斥锁防击穿、TTL 随机偏移防雪崩；写操作提交后延迟双删，
   失效统一走 `SCAN` 而非 `KEYS`，避免阻塞 Redis；
 - **锁与死锁演练**：T08/T09 用双会话复现锁等待，借 `SHOW ENGINE INNODB STATUS` 定位等待链并沉淀排查 SQL；
 - **索引优化**：补充 `(category_id, status, create_time)` 复合索引消除 index_merge 与 filesort
-  （89 ms → 34 ms），把低基数 `idx_drug_status` 设为 INVISIBLE 让模糊查询回到全表扫描；
+  （本地环境压测、单实例：89 ms → 34 ms），把低基数 `idx_drug_status` 设为 INVISIBLE
+  让模糊查询回到全表扫描；
 - **连接池观测**：压测期间采集 Druid 活跃连接、等待线程与慢 SQL，形成可复现证据（T06）；
 - 相关 SQL 与结论见 `docs/04-运维与故障排查/003_database_optimization_and_fixes.sql` 与
   [docs/portfolio/01-database/](docs/portfolio/01-database/)。
 
-### 5. 容器化一键部署
+### 5. 容器化部署（基础设施 + 核心服务）
 
 提供多阶段构建的通用 `Dockerfile`（`MODULE` 构建参数复用给任意微服务）与 `docker-compose.yml`：
 
-- 一条命令拉起 **Nacos 3 + MySQL 8 + Redis Stack + catalog-service + ai-service**；
+- 一条命令拉起 **Nacos 3 + MySQL 8 + Redis Stack + catalog-service + ai-service**（不含其余业务服务）；
 - MySQL 首次创建数据卷时自动执行建表脚本；
 - Nacos 3.x 鉴权初始化由一次性容器自动完成；
 - 所有敏感配置通过根目录 `.env` 注入，`.env` 已被 `.gitignore` 排除；
@@ -129,11 +132,15 @@
 
 ### 6. 可复现的测试与排障证据
 
+> 测试口径：本节所有并发、耗时与召回指标均来自**本地单实例环境**，仅用于功能验证与参数调优，
+> 不是生产集群实测，也不构成生产容量承诺。
+
 - **压测与故障演练**：JMeter 计划覆盖缓存命中 / 穿透 / 延迟双删、Feign 熔断、网关限流、
   连接池耗尽、并发加购与 MQ 行为观察；
 - **安全**：T26 复现水平越权（IDOR）→ 修复 → 回归，越权请求返回无权限、订单数不变；
 - **AI 失败路径**：T31 覆盖空输入、工具异常、RAG 空召回、跨用户记忆隔离与处方审核 fail-closed；
-- **RAG 评测**：20 题自建评测集，15 道可回答题 Hit Rate@4 = 100%，并验证阈值 0.8 会掉到 13/15；
+- **RAG 评测（本地离线评测，单实例）**：20 题自建评测集，15 道可回答题 Hit Rate@4 = 100%，
+  并验证阈值 0.8 会掉到 13/15；
 - 原始输出与截图统一索引在 [docs/portfolio/README.md](docs/portfolio/README.md)，可逐条回溯到
   对应测试记录。
 
@@ -315,7 +322,7 @@ ysd-take-out/
 ├── docker/mysql/init/       # MySQL 首次启动自动建表
 ├── docker/nginx/            # 管理端 Nginx 反代示例
 ├── scripts/                 # 开源导出脚本（一键启停见根目录 start-all.sh / stop-all.sh）
-├── docker-compose.yml       # 基础设施 + catalog + AI 一键编排
+├── docker-compose.yml       # 基础设施 + catalog + AI 编排
 ├── Dockerfile               # 多阶段构建，MODULE 参数复用
 ├── SECURITY.md              # 安全策略与部署加固清单
 ├── CONTRIBUTING.md          # 贡献指南
@@ -351,6 +358,7 @@ ysd-take-out/
 | Docker | Docker Desktop / Docker Engine |
 | Docker Compose | v2（使用 `docker compose` 命令） |
 | 内存 | 建议 ≥ 8 GB（Nacos + MySQL + Redis + 两个 Java 服务） |
+| JDK / Maven | JDK 21、Maven 3.9；仅本机启动其余业务服务时需要 |
 | Ollama | 仅 AI 服务需要；宿主机监听 `0.0.0.0:18434`，并已 `ollama pull bge-m3` |
 | DeepSeek API Key | 仅 AI 对话需要；不填不影响其余服务启动 |
 
@@ -412,7 +420,7 @@ ollama pull bge-m3
 > Compose 会把 `OLLAMA_BASE_URL` 注入为 `http://host.docker.internal:18434`。
 > 不需要 AI 服务时，可单独启动基础设施与 catalog：`docker compose up -d nacos nacos-init mysql redis ysd-catalog-service`。
 
-### 3. 一键启动
+### 3. 启动 Compose 栈
 
 ```bash
 docker compose up -d
@@ -471,7 +479,7 @@ mvn -pl ysd-push-service    spring-boot:run
 mvn -pl ysd-gateway spring-boot:run
 ```
 
-#### 方式 B：`start-all.sh`（本机全量启动）
+#### 使用 `start-all.sh` 启动全部服务（本机）
 
 适合已经装好 JDK 21 / Maven、且中间件已在本机运行的开发环境：
 
@@ -646,6 +654,21 @@ curl -G "http://localhost:9000/ai/prescription/check" \
 - 业务服务默认只监听 `127.0.0.1`，容器内通过 `SERVER_ADDRESS=0.0.0.0` 覆盖；仅网关需要对外暴露，
   **不要把 8081–8088 直接发布到公网**。网关会在路由前无条件移除客户端传入的 `X-Identity-Id`，
   校验 JWT 后再注入可信身份头。
+
+---
+
+## 安全声明
+
+- **敏感信息零泄露**：仓库及其 Git 历史中不包含真实密钥、证书或生产凭据；所有敏感配置均通过环境变量注入，
+  `.env.example` 只保留占位符。
+- `.env` 与 `.env.*` 已被 `.gitignore` 排除（仅保留 `.env.example`）；日志、证书、压测产物与前端构建产物
+  同样不进入版本库。
+- 本次审计已对工作区与 Git 历史执行常见密钥模式扫描，未发现真实凭据；如发现疑似泄露，请按
+  [SECURITY.md](SECURITY.md) 私密上报，不要先开公开 Issue。
+- 测试证据中的 JWT 均为本地开发环境的短期令牌（已过期），密钥为本地默认值；测试数据不包含真实用户
+  手机号、地址或生产凭据。
+- 业务服务默认只监听 `127.0.0.1`，仅网关需要对外；生产部署必须替换演示密钥与默认口令，并关闭或限制
+  Swagger / Actuator 的公网访问。
 
 ---
 

@@ -9,6 +9,8 @@
 ![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.8-6DB33F?logo=spring&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
+简体中文 | *[English](./README_EN.md)*
+
 ---
 
 ## 目录

@@ -1,4 +1,4 @@
-# YSD Medical Delivery (ysd-take-out) - Spring Cloud + Spring AI
+# YSD Medical Delivery (ysd-medical-delivery) - Spring Cloud + Spring AI
 
 *[简体中文](./README.md) | English*
 
